@@ -4,8 +4,8 @@ Fahrdienst mit dem eigenen Auto als vierter Einstiegsjob (neben Kasse, Essenslie
 Kein Depot, kein Firmenwagen, keine Schicht – man geht online, nimmt ein paar Fahrten mit, geht offline.
 
 ## Stufen
-1. **Gerüst** – Mod lädt, Options-Eintrag erscheint (dieses Startpaket). ✔ wenn im Spiel sichtbar
-2. **Online gehen** – Button im Fahrzeug-Panel (neben „Parken“), sichtbar nur im eigenen Auto; Bestätigungsdialog; `QuickRidMission : PlayerMission` wird `SaveGameManager.Current.currentPlayerMission`, Aufgabenpanel zeigt „Auf eine Fahrtanfrage warten“. Offline geht über denselben Button oder das X im Panel. ✔ wenn der Button nur im eigenen Auto erscheint und das Panel auf-/zugeht
+1. **Gerüst** ABGESCHLOSSEN – Mod lädt, Options-Eintrag erscheint (dieses Startpaket). ✔ wenn im Spiel sichtbar
+2. **Online gehen** ABGESCHLOSSEN – Button im Fahrzeug-Panel (neben „Parken“), sichtbar nur im eigenen Auto; Bestätigungsdialog; `QuickRidMission : PlayerMission` wird `SaveGameManager.Current.currentPlayerMission`, Aufgabenpanel zeigt „Auf eine Fahrtanfrage warten“. Offline geht über denselben Button oder das X im Panel. ✔ wenn der Button nur im eigenen Auto erscheint und das Panel auf-/zugeht
 3. **Fahrgast** – zufällige Gebäudetür in Reichweite, NPC spawnen (`Characters/HumanDefinitionLow`), Marker, einsteigen im Pickup-Radius, Ziel = andere Adresse (min/max Distanz)
 4. **Ankunft & Bezahlung** – Distanz + Stillstand, Fahrpreis = Grundpauschale + Betrag/Meter × Multiplikator × Rating-Modifier, Sterne berechnen, `GameManager.ChangeMoneySafe`
    - Dabei die feste 24-Stunden-`endTime` aus Stufe 2 abschaffen – ein Fahrdienst hat keine Schicht. Entweder `endTime` weit in die Zukunft setzen oder `IsOngoing()` überschreiben. Ein Zeitlimit gehört dann an die einzelne Fahrt, nicht an die Schicht.
