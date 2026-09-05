@@ -57,16 +57,7 @@ namespace CherryQuickRid
 
         protected override void OnClickCancelJob()
         {
-            if (HudConfirm.isOpen)
-                return;
-
-            HudConfirm.Show(
-                "quickrid_job_title",
-                "quickrid_go_offline_confirm",
-                _controller.GoOffline,
-                null,
-                "quickrid_go_offline",
-                "quickrid_decline_job");
+            _controller.PromptGoOffline();
         }
     }
 }
