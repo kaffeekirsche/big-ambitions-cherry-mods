@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using System.Collections.Generic;
 using BigAmbitions.DayNightCycle;
 using Player.PlayerMissions;
 
@@ -20,6 +21,11 @@ namespace CherryQuickRid
     /// <para>
     /// Laufzeit-Referenzen (Auto, gespawnter Fahrgast, gecachte Transforms) gehören bewusst nicht
     /// hierher, sondern in <see cref="QuickRidController"/>.
+    /// </para>
+    /// <para>
+    /// <c>endTime</c> liegt seit Stufe 4 zehn Jahre in der Zukunft: ein Fahrdienst hat keine Schicht.
+    /// <c>PlayerMission.IsOngoing()</c> ist nicht virtual und lässt sich deshalb nicht überschreiben;
+    /// kein Spielcode wertet die Frist einer fremden Missionsklasse aus.
     /// </para>
     /// </remarks>
     [Serializable]
@@ -42,10 +48,13 @@ namespace CherryQuickRid
         /// <summary>Zieladresse der Fahrt. Null, solange keine Anfrage offen ist.</summary>
         public Address? destinationAddress;
 
-        /// <summary>Berechneter Fahrpreis. In Stufe 3 nur Anzeige – ausgezahlt wird ab Stufe 4.</summary>
+        /// <summary>
+        /// Fahrpreis inklusive Rating-Modifier, wie er im Angebotsdialog stand. Wird beim Absetzen
+        /// unverändert ausgezahlt – der genannte Preis muss dem gezahlten entsprechen.
+        /// </summary>
         public float fare;
 
-        /// <summary>Luftlinie Abholung → Ziel in Metern, Grundlage des Fahrpreises.</summary>
+        /// <summary>Luftlinie Abholung → Ziel in Metern, Grundlage von Fahrpreis und Zeitfenster.</summary>
         public float tripDistance;
 
         /// <summary>Spielzeit, ab der die nächste Anfrage erscheinen darf. Null = beim nächsten Tick würfeln.</summary>
@@ -58,10 +67,45 @@ namespace CherryQuickRid
         /// <summary>Spielzeit, ab der eine nicht angenommene Anfrage lautlos verfällt.</summary>
         public Timestamp? offerExpiryTime;
 
-        /// <summary>Spielzeit der Auftragsannahme. Ab Stufe 4 Grundlage der Sternebewertung.</summary>
+        /// <summary>Spielzeit der Auftragsannahme. Nur Statistik – bewertet wird ab <see cref="boardingTime"/>.</summary>
         public Timestamp? tripStartTime;
 
-        /// <summary>Setzt alle fahrtbezogenen Felder zurück, ohne die Schicht zu beenden.</summary>
+        /// <summary>
+        /// Spielzeit, zu der der Fahrgast eingestiegen ist. Ab hier läuft die bewertete Fahrzeit,
+        /// weil sich das Zeitfenster aus der Distanz Abholung → Ziel ableitet, nicht aus der Anfahrt.
+        /// </summary>
+        public Timestamp? boardingTime;
+
+        /// <summary><c>VehicleInstance.damage</c> (0..1) beim Einstieg. Bewertet wird nur der Zuwachs bis zum Absetzen.</summary>
+        public float damageAtBoarding;
+
+        // --- Statistik und Rating ---------------------------------------------------------------
+        // Kopie der dauerhaften Werte aus SaveGameManager.Current.modData (siehe QuickRidStats).
+        // Beim Online-Gehen geladen, nach jeder Fahrt und beim Offline-Gehen zurückgeschrieben.
+
+        /// <summary>Abgeschlossene Fahrten insgesamt.</summary>
+        public int completedTrips;
+
+        /// <summary>Ausgezahlte Fahrpreise insgesamt (ohne Trinkgeld).</summary>
+        public float totalEarnings;
+
+        /// <summary>Trinkgeld insgesamt. Bleibt bis Stufe 6 immer 0.</summary>
+        public float totalTips;
+
+        /// <summary>
+        /// Sterne der letzten <see cref="QuickRidRating.HistoryLength"/> Fahrten, älteste zuerst.
+        /// Nie direkt lesen – <see cref="GetRatingHistory"/> benutzen: Odin legt Objekte ohne
+        /// Konstruktor an, der Feldinitialisierer greift also nur im JSON-Pfad.
+        /// </summary>
+        public List<int>? ratingHistory = new List<int>();
+
+        /// <summary>Historie mit Null-Guard. Methode statt Property, damit Newtonsoft sie nicht mitschreibt.</summary>
+        public List<int> GetRatingHistory()
+        {
+            return ratingHistory ??= new List<int>();
+        }
+
+        /// <summary>Setzt alle fahrtbezogenen Felder zurück, ohne Schicht, Statistik oder Historie anzufassen.</summary>
         public void ClearTrip()
         {
             state = QuickRidTripState.Waiting;
@@ -71,6 +115,8 @@ namespace CherryQuickRid
             tripDistance = 0f;
             offerExpiryTime = null;
             tripStartTime = null;
+            boardingTime = null;
+            damageAtBoarding = 0f;
         }
     }
 }

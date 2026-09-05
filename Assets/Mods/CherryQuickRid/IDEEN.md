@@ -11,12 +11,33 @@ Kein Depot, kein Firmenwagen, keine Schicht – man geht online, nimmt ein paar 
    - Fahrgast-Prefab ist `Characters/DummyHuman` (`BaseHuman`), **nicht** `Characters/HumanDefinitionLow`: letzteres ist ein `ThirdPersonCharacter` mit Update-Schleife, NavMeshAgent und Rigging. `DummyHuman` ist das, was das Spiel selbst für stehende NPCs nimmt (`SellerStandController`, `BaseHumanPool`). Das Prefab wird inaktiv ausgeliefert – `SetActive(true)` nicht vergessen, sonst bleibt der Fahrgast unsichtbar (dieser Fehler steckt in der Be-A-Taxi-Vorlage).
    - Aussehen wird nur einmal beim Anlegen gewürfelt. `AppearanceSetter` baut dabei ein Runtime-Mesh, und der SkinnedMeshCombiner ist Fremdcode ohne Quelle – ob ein erneutes Würfeln das alte Mesh freigibt, ist nicht nachprüfbar. `BaseHumanPool` im Spiel macht es genauso.
 4. **Ankunft & Bezahlung** – Distanz + Stillstand, Fahrpreis = Grundpauschale + Betrag/Meter × Multiplikator × Rating-Modifier, Sterne berechnen, `GameManager.ChangeMoneySafe`
-   - Dabei die feste 24-Stunden-`endTime` aus Stufe 2 abschaffen – ein Fahrdienst hat keine Schicht. Entweder `endTime` weit in die Zukunft setzen oder `IsOngoing()` überschreiben. Ein Zeitlimit gehört dann an die einzelne Fahrt, nicht an die Schicht.
-5. **Abschluss** – Tagesübersicht wie Lieferjob (`DeliveryDriverMission` → `DailySummary.RunDeliveryJobSummary`), Rating im Savegame (`modData`)
+   - Die feste 24-Stunden-`endTime` ist weg: `PlayerMission.IsOngoing()` ist **nicht virtual**, überschreiben geht also nicht. Stattdessen liegt `endTime` zehn Jahre in der Zukunft (`timeLimitMinutes = 0`); kein Spielcode wertet die Frist einer fremden Missionsklasse aus, alle `IsOngoing`-Aufrufe im Spiel sind typspezifisch (FoodDelivery, DeliveryDriver). Alte Spielstände werden in `RestoreState` migriert.
+   - Rating-Modifier steckt schon im Angebotspreis (`TryCreateRequest`), ausgezahlt wird `mission.fare` unverändert – der Preis aus dem Dialog muss dem gezahlten entsprechen. Ohne bewertete Fahrt gilt Modifier 1,0.
+   - Zeitfenster: Fahrzeit zählt ab Einstieg (`boardingTime`), Soll = (`BaseMinutes` 15 + Luftlinie / 8 m pro **Spielminute**) × Zeitpuffer. Die Spieluhr läuft bei 1× mit einer Spielminute pro Realsekunde (`GameManager.RunMainGameTick`), Autos fahren in Realzeit – 8 m/Spielminute ist also 8 m/s Realzeit. Die Grundzeit deckt wie in Vanilla das ab, was auf jeder Fahrt gleich anfällt (wenden, Parklücke suchen); die Essenslieferung rechnet dafür 60 Minuten, dort aber für einen Fußweg.
+   - Anzeige: Der Angebotsdialog nennt das Zeitfenster (`{minutes}` in `quickrid_offer_body`), mit Fahrgast an Bord zeigt das Aufgabenpanel statt des Statustexts die Restzeit als `HH:MM`-Countdown (nach Ablauf mit Minuszeichen) plus eine Sterne-Vorschau fürs sofortige Absetzen. Beides kommt aus `QuickRidController.TryGetTripPreview`, damit Vorschau und Abrechnung dieselbe Rechnung benutzen.
+   - Schaden = Zuwachs von `VehicleInstance.damage` seit dem Einstieg; unter 1 % kein Abzug (`MinDamageForPenalty`).
+   - Historie (letzte 10) und Zähler liegen in `QuickRidMission` **und** dauerhaft in `modData` (`quickrid:rating_history`, `quickrid:stats`, siehe `QuickRidStats`): Laden beim Online-Gehen und in `RestoreState`, Zurückschreiben nach jeder Fahrt und beim Offline-Gehen. Offline gehen mit Fahrgast an Bord = 1 Stern; der Lade-Abbruch kostet keinen Stern.
+   - EconoView zeigt den Transaktionstyp doppelt: Beschreibung = `quickrid_transaction`, Typ-Spalte/Filter = derselbe Key + `_label` → `quickrid_transaction_label` ist Pflicht.
+5. **Abschluss** – Tagesübersicht wie Lieferjob (`DeliveryDriverMission` → `DailySummary.RunDeliveryJobSummary`); Rating liegt seit Stufe 4 in `modData`, hier nur noch in die Übersicht aufnehmen. Wiederherstellung einer laufenden Fahrt beim Laden.
 6. **Feinschliff** – Peak/Nacht-Tarif (`TimeHelper.IsInHourRange`), Trinkgeld, Kartenfilter unter Jobs, Icon, Balancing gegen Vanilla-Lieferjob
 
 ## Balancing-Ziel
-Eine typische Fahrt ≈ ein Essenslieferauftrag. Flexibler, nicht lukrativer. Aufwärtspotenzial nur über Rating und Auto.
+QuickRid liegt zwischen den beiden Vanilla-Einstiegsjobs: mehr als eine Essenslieferung, weniger als eine Lieferfahrer-Tour. Aufwärtspotenzial nur über Rating und Auto.
+
+Vanilla-Werte aus `_reference/GameSource~` (Stand Stufe 4):
+
+| | Essenslieferung | Lieferfahrer | QuickRid |
+|---|---|---|---|
+| Geld | 30 $ + 0,08 $/m, max. 600 m | 100 $ je Ziel × 3 Ziele | 30 $ + 0,10 $/m |
+| 300 m | 54 $ | – | 60 $ |
+| 600 m | 78 $ | – | 90 $ |
+| 1500 m | nicht möglich | ~300 $ für die ganze Tour | 180 $ |
+| Zeit | 60 + 0,45 min/m, 60–360 | Gesamtstrecke × `minutesPerMeter` (Asset) | (15 + 0,125 min/m) × 150 % |
+| Überschreitung | Abbruch ohne Geld | folgenlos, offene Ziele verfallen | Sternabzug, Geld bleibt |
+| Trinkgeld | 1 Wurf je Lieferung | 1 Wurf je Ziel | erst Stufe 6 |
+| Schaden | – | Reparaturkosten vom Lohn | 1 Stern ab 1 % |
+
+Fundstellen: `FoodDeliveryJobConfig` (baseReward, rewardPerMeter, destinationRadius, baseTimeMinutes, minutesPerMeter), `FoodDeliveryJobHelper.TryCreateOfferAt`, `DeliveryJobStartLocation.deliveryReward`, `DeliveryJobStartController.PromptJob`, `DeliveryJobVehicle.GiveEarningsAndReset`.
 
 ## Offene Fragen
 - Fahrzeugklasse als Tariffaktor (Kleinwagen/Limousine)?

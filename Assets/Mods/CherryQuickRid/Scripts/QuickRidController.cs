@@ -27,10 +27,18 @@ namespace CherryQuickRid
     public sealed class QuickRidController : MonoBehaviour
     {
         /// <summary>
-        /// Laufzeit der Schicht. Stufe 2/3 werten sie nicht aus; in Stufe 4 fällt die feste Frist weg
-        /// (ein Fahrdienst hat keine Schicht) – siehe IDEEN.md.
+        /// So weit liegt <c>endTime</c> der Schicht in der Zukunft. Ein Fahrdienst hat keine Schicht;
+        /// <c>PlayerMission.IsOngoing()</c> ist aber nicht virtual, also bleibt nur eine Frist, die nie
+        /// abläuft. Kein Spielcode wertet die Frist einer fremden Missionsklasse aus (siehe IDEEN.md).
         /// </summary>
-        private const int OnlineDurationMinutes = 1440;
+        private const int OpenEndDays = 3650;
+
+        /// <summary>Trinkgeld pro Fahrt. Bleibt bis Stufe 6 (Trinkgeld-Mechanik) bei 0.</summary>
+        private const float TipAmount = 0f;
+
+        /// <summary>Beschreibungs-Key der Auszahlung. EconoView hängt für die Typ-Spalte "_label" an.</summary>
+        private const string TransactionKey = "quickrid_transaction";
+        private const string TransactionCategory = "ba:transactioncategory_salaryincome";
 
         private const string ButtonName = "QuickRid - Job Button";
 
@@ -42,9 +50,23 @@ namespace CherryQuickRid
         /// </summary>
         private const string PassengerPrefab = "Characters/DummyHuman";
 
-        /// <summary>Fahrpreisformel. Balancing gegen den Vanilla-Lieferjob ist Stufe 6.</summary>
-        private const float FixedBaseFare = 5f;
-        private const float FarePerMeter = 0.08f;
+        /// <summary>
+        /// Fahrpreisformel, eingeordnet zwischen die beiden Vanilla-Einstiegsjobs.
+        /// </summary>
+        /// <remarks>
+        /// Die Essenslieferung zahlt <c>30 + Distanz × 0,08</c> und reicht höchstens 600 m weit
+        /// (FoodDeliveryJobConfig: baseReward, rewardPerMeter, destinationRadius) – das sind 54 $ auf
+        /// 300 m und 78 $ auf 600 m. Der Lieferfahrer bringt 100 $ je Ziel bei drei Zielen, also rund
+        /// 300 $ brutto abzüglich Reparaturkosten (DeliveryJobStartLocation.deliveryReward,
+        /// DeliveryJobHelper.TryDeliverToDestination). QuickRid liegt mit gleicher Pauschale und
+        /// leicht höherem Meterpreis dazwischen: 60 $ auf 300 m, 90 $ auf 600 m, 180 $ auf 1500 m.
+        /// <para>
+        /// <see cref="MinimumFare"/> greift bei diesen Werten nicht mehr und bleibt nur als Absicherung
+        /// stehen, falls Multiplikator und Rating-Modifier gemeinsam nach unten laufen.
+        /// </para>
+        /// </remarks>
+        private const float FixedBaseFare = 30f;
+        private const float FarePerMeter = 0.10f;
         private const float MinimumFare = 10f;
 
         /// <summary>Schrittgeschwindigkeit in m/s – bis hierher gilt das Auto als "steht".</summary>
@@ -203,10 +225,23 @@ namespace CherryQuickRid
         /// Nach dem Laden eines Spielstands: Aufgabenpanel wiederherstellen und den Button nachziehen,
         /// falls der Spieler bereits im Auto sitzt (dann ist onEnterVehicle schon durch).
         /// Eine laufende Fahrt wird abgebrochen – ihre Wiederherstellung ist Stufe 5 (siehe IDEEN.md).
+        /// Der Abbruch kostet keinen Stern: er ist eine technische Einschränkung, keine Entscheidung
+        /// des Spielers.
         /// </summary>
         private void RestoreState()
         {
             QuickRidMission? mission = Mission;
+
+            if (mission != null)
+            {
+                // Statistik kommt aus modData, nicht aus der gespeicherten Mission – so gilt überall
+                // derselbe Stand, auch wenn der Spielstand mitten in einer Schicht geschrieben wurde.
+                QuickRidStats.LoadInto(mission);
+
+                // Spielstände aus Stufe 2/3 tragen noch die feste 24-Stunden-Frist.
+                mission.endTime = CreateOpenEndTime();
+                mission.timeLimitMinutes = 0;
+            }
 
             if (mission != null && mission.state != QuickRidTripState.Waiting)
             {
@@ -283,6 +318,10 @@ namespace CherryQuickRid
             if (mission.destinationAddress != null)
                 GuidersManager.SetGuiderTarget(mission.destinationAddress, DirectionGuiderType.JobDestination);
 
+            // Ab hier läuft die bewertete Fahrzeit; Schaden zählt nur als Zuwachs ab jetzt.
+            mission.boardingTime = TimeHelper.Now();
+            mission.damageAtBoarding = _missionCar.vehicleInstance != null ? _missionCar.vehicleInstance.damage : 0f;
+
             mission.state = QuickRidTripState.PassengerAboard;
             Notifications.Show(NotificationType.Info, "quickrid_passenger_aboard");
             _tasksUi?.UpdateUI();
@@ -307,15 +346,50 @@ namespace CherryQuickRid
             if ((_missionCar.transform.position - entrance.position).sqrMagnitude > radius * radius)
                 return;
 
-            // Stufe 3 zeigt den Fahrpreis nur an; ausgezahlt wird er ab Stufe 4.
+            CompleteTrip(mission, _missionCar);
+        }
+
+        /// <summary>
+        /// Fahrgast abgesetzt: Sterne berechnen, Fahrpreis auszahlen, Statistik fortschreiben.
+        /// Vorlage für die Auszahlung: CompleteShift in _reference/BeATaxi~/BeATaxi/TaxiShiftController.cs
+        /// und Vanilla DeliveryJobVehicle.GiveEarningsAndReset.
+        /// </summary>
+        /// <remarks>
+        /// Ausgezahlt wird <c>mission.fare</c> unverändert – der Rating-Modifier steckt seit der Anfrage
+        /// darin, damit der Preis aus dem Dialog dem gezahlten entspricht. Zeit und Schaden kommen aus
+        /// <see cref="GetTripProgress"/>, damit die Vorschau im Panel dieselbe Rechnung zeigt.
+        /// </remarks>
+        private void CompleteTrip(QuickRidMission mission, CarController car)
+        {
+            GetTripProgress(mission, car, out float elapsedMinutes, out float allowedMinutes, out float damageTaken);
+
+            int stars = QuickRidRating.CalculateStars(elapsedMinutes, allowedMinutes, damageTaken);
             float fare = mission.fare;
+            float tips = TipAmount;
+
+            GameManager.ChangeMoneySafe(fare + tips, new TransactionInfo(TransactionKey, TransactionCategory));
+
+            QuickRidRating.Push(mission.GetRatingHistory(), stars);
+            mission.completedTrips++;
+            mission.totalEarnings += fare;
+            mission.totalTips += tips;
+            QuickRidStats.SaveFrom(mission);
 
             GuidersManager.ResetGuider(DirectionGuiderType.JobDestination);
             mission.ClearTrip();
             mission.nextRequestTime = CreateWaitDeadline();
 
-            Notifications.Show(NotificationType.Success, "quickrid_passenger_dropped",
-                new Dictionary<string, string> { { "fare", fare.ToString("0") } });
+            Notifications.Show(NotificationType.Success, "quickrid_trip_complete",
+                new Dictionary<string, string>
+                {
+                    { "fare", fare.ToString("0") },
+                    { "tips", tips.ToString("0") },
+                    { "stars", stars.ToString() }
+                });
+
+            _context?.Logger.Info(
+                $"QuickRid: Fahrt abgeschlossen – {elapsedMinutes:0}/{allowedMinutes:0} min, " +
+                $"Schaden {damageTaken:0.000}, {stars} Sterne, ${fare:0}, Schnitt {QuickRidRating.FormatAverage(mission.GetRatingHistory())}.");
 
             _tasksUi?.UpdateUI();
         }
@@ -327,6 +401,50 @@ namespace CherryQuickRid
             mission.ClearTrip();
             mission.nextRequestTime = CreateWaitDeadline();
             _tasksUi?.UpdateUI();
+        }
+
+        /// <summary>
+        /// Stand der laufenden Fahrt: verstrichene Zeit, Zeitfenster und Schadenzuwachs seit dem
+        /// Einstieg. Grundlage sowohl der Abrechnung als auch der Vorschau im Aufgabenpanel.
+        /// </summary>
+        /// <remarks>
+        /// Die Dauer wird über <c>GetTotalMinutes</c> gerechnet;
+        /// <c>Timestamp.GetDifferenceInMinutes</c> wird im Spielcode mit beiden Vorzeichenrichtungen
+        /// benutzt und ist deshalb nicht verlässlich lesbar.
+        /// </remarks>
+        private static void GetTripProgress(QuickRidMission mission, CarController? car,
+            out float elapsedMinutes, out float allowedMinutes, out float damageTaken)
+        {
+            allowedMinutes = QuickRidRating.AllowedMinutes(mission.tripDistance);
+            elapsedMinutes = mission.boardingTime != null
+                ? Mathf.Max(0f, TimeHelper.NowInMinutes() - mission.boardingTime.GetTotalMinutes())
+                : 0f;
+
+            // Ohne auffindbares Auto (z. B. in einem Gebäude geparkt) zählt nur die Zeit.
+            float currentDamage = car != null && car.vehicleInstance != null
+                ? car.vehicleInstance.damage
+                : mission.damageAtBoarding;
+
+            damageTaken = Mathf.Max(0f, currentDamage - mission.damageAtBoarding); // Reparatur unterwegs → 0
+        }
+
+        /// <summary>
+        /// Für das Aufgabenpanel: Restzeit des Zeitfensters (negativ bei Überschreitung) und die
+        /// Sterne, die ein sofortiges Absetzen ergäbe. Liefert false, wenn gerade keine Fahrt läuft.
+        /// </summary>
+        public bool TryGetTripPreview(QuickRidMission mission, out float remainingMinutes, out int stars)
+        {
+            remainingMinutes = 0f;
+            stars = 5;
+
+            if (mission.state != QuickRidTripState.PassengerAboard || mission.boardingTime == null)
+                return false;
+
+            GetTripProgress(mission, _missionCar, out float elapsed, out float allowed, out float damage);
+
+            remainingMinutes = allowed - elapsed;
+            stars = QuickRidRating.CalculateStars(elapsed, allowed, damage);
+            return true;
         }
 
         /// <summary>
@@ -422,7 +540,7 @@ namespace CherryQuickRid
             mission.pickupAddress = pickupAddress;
             mission.destinationAddress = destination.address;
             mission.tripDistance = distance;
-            mission.fare = CalculateFare(distance);
+            mission.fare = CalculateFare(distance, QuickRidRating.CurrentModifier(mission.GetRatingHistory()));
             mission.offerExpiryTime = CreateOfferDeadline();
             mission.state = QuickRidTripState.Offered;
             return true;
@@ -444,7 +562,9 @@ namespace CherryQuickRid
                     pickup = AddressHelper.ToFormattedString(mission.pickupAddress),
                     destination = AddressHelper.ToFormattedString(mission.destinationAddress),
                     distance = UnitHelper.ToFormattedDistance(mission.tripDistance),
-                    fare = mission.fare.ToString("0")
+                    fare = mission.fare.ToString("0"),
+                    // Das Zeitfenster läuft erst ab dem Einstieg – der Text sagt das dazu.
+                    minutes = Mathf.RoundToInt(QuickRidRating.AllowedMinutes(mission.tripDistance))
                 }
             };
 
@@ -515,10 +635,19 @@ namespace CherryQuickRid
                 DirectionGuiderType.JobDestination);
         }
 
-        private static float CalculateFare(float distance)
+        /// <param name="ratingModifier">Bonus/Malus aus <see cref="QuickRidRating.CurrentModifier"/>.</param>
+        private static float CalculateFare(float distance, float ratingModifier)
         {
-            float raw = (FixedBaseFare + distance * FarePerMeter) * QuickRidSettings.FareMultiplier;
+            float raw = (FixedBaseFare + distance * FarePerMeter) * QuickRidSettings.FareMultiplier * ratingModifier;
             return Mathf.Max(MinimumFare, Mathf.Round(raw));
+        }
+
+        /// <summary>Schicht-Ende, das nie eintritt – siehe <see cref="OpenEndDays"/>.</summary>
+        private static Timestamp CreateOpenEndTime()
+        {
+            Timestamp endTime = TimeHelper.Now();
+            endTime.AddDays(OpenEndDays);
+            return endTime;
         }
 
         /// <remarks>
@@ -957,12 +1086,18 @@ namespace CherryQuickRid
         /// <summary>Bestätigungsdialog vor dem Offline-Gehen – für den Fahrzeug-Button und das Aufgabenpanel.</summary>
         public void PromptGoOffline()
         {
-            if (Mission == null || HudConfirm.isOpen)
+            QuickRidMission? mission = Mission;
+            if (mission == null || HudConfirm.isOpen)
                 return;
+
+            // Mit Fahrgast an Bord kostet Offline gehen einen Stern – das muss im Dialog stehen.
+            string bodyKey = mission.state == QuickRidTripState.PassengerAboard
+                ? "quickrid_go_offline_confirm_passenger"
+                : "quickrid_go_offline_confirm";
 
             HudConfirm.Show(
                 "quickrid_job_title",
-                "quickrid_go_offline_confirm",
+                bodyKey,
                 GoOffline,
                 null,
                 "quickrid_go_offline",
@@ -974,18 +1109,18 @@ namespace CherryQuickRid
             if (car == null || car.vehicleInstance == null || SaveGameManager.Current.currentPlayerMission != null)
                 return;
 
-            Timestamp endTime = TimeHelper.Now();
-            endTime.AddMinutes(OnlineDurationMinutes);
-
-            SaveGameManager.Current.currentPlayerMission = new QuickRidMission
+            var mission = new QuickRidMission
             {
                 vehicleId = car.vehicleInstance.id,
                 startTime = TimeHelper.Now(),
-                endTime = endTime,
-                timeLimitMinutes = OnlineDurationMinutes,
+                endTime = CreateOpenEndTime(),
+                timeLimitMinutes = 0,
                 state = QuickRidTripState.Waiting,
                 nextRequestTime = CreateWaitDeadline()
             };
+            QuickRidStats.LoadInto(mission);
+
+            SaveGameManager.Current.currentPlayerMission = mission;
 
             if (InstanceBehavior<UIs>.Instance.tasksUI.IsCollapsed)
                 InstanceBehavior<UIs>.Instance.tasksUI.SetCollapsedState(false);
@@ -997,8 +1132,20 @@ namespace CherryQuickRid
 
         public void GoOffline()
         {
-            if (Mission == null)
+            QuickRidMission? mission = Mission;
+            if (mission == null)
                 return;
+
+            // Wer mit Fahrgast an Bord offline geht, lässt ihn sitzen: 1 Stern, kein Fahrpreis.
+            if (mission.state == QuickRidTripState.PassengerAboard)
+            {
+                QuickRidRating.Push(mission.GetRatingHistory(), 1);
+                Notifications.Show(NotificationType.Warning, "quickrid_trip_abandoned");
+                _context?.Logger.Info("QuickRid: Fahrgast beim Offline-Gehen im Stich gelassen – 1 Stern.");
+            }
+
+            // Die Mission wird gleich gelöscht; Historie und Zähler überleben nur in modData.
+            QuickRidStats.SaveFrom(mission);
 
             // Fahrgast und Kartenpin gehören zur Schicht – beides muss mit ihr verschwinden.
             HidePassenger();
