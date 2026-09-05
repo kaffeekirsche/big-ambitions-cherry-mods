@@ -52,3 +52,7 @@ Assets/_BaDependencies/GameDlls/**/*.dll.meta
 
 # External mod repositories
 Assets/Mods/LIB_BaComputerGames/
+
+
+_reference/
+CLAUDE.md.meta

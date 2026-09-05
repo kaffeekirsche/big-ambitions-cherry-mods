@@ -1,0 +1,45 @@
+#nullable enable
+using System;
+using System.Threading.Tasks;
+using BAModAPI;
+using UnityEngine;
+
+[assembly: RegisterModClass(typeof(CherryQuickRid.QuickRidCityMod))]
+
+namespace CherryQuickRid
+{
+    /// <summary>
+    /// Einstiegspunkt beim Laden der Stadt: legt das Controller-GameObject an.
+    /// </summary>
+    [ModEntryOnCityLoad]
+    public sealed class QuickRidCityMod : IModBigAmbitions
+    {
+        private static GameObject? _controllerObject;
+
+        public string[] RelativeAssetBundlePaths => Array.Empty<string>();
+
+        public Task OnLoadAsync(ModContext context)
+        {
+            if (_controllerObject == null)
+            {
+                _controllerObject = new GameObject("QuickRid - Controller");
+                UnityEngine.Object.DontDestroyOnLoad(_controllerObject);
+                var controller = _controllerObject.AddComponent<QuickRidController>();
+                controller.Initialize(context);
+            }
+
+            context.Logger.Info("QuickRid city mod loaded.");
+            return Task.CompletedTask;
+        }
+
+        public Task OnUnloadAsync()
+        {
+            if (_controllerObject != null)
+            {
+                UnityEngine.Object.Destroy(_controllerObject);
+                _controllerObject = null;
+            }
+            return Task.CompletedTask;
+        }
+    }
+}

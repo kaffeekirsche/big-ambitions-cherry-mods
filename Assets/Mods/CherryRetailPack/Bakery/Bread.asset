@@ -10,34 +10,24 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 1411348409, guid: db7404fdd66bed727abbb3141ba453dd, type: 3}
-  m_Name: GigaCounter
+  m_Name: Bread
   m_EditorClassIdentifier: 
   database: {fileID: 0}
   tags: []
-  itemName: example-furniture:itemname_gigacounter
-  type: 262144
+  itemName: cherryretail:itemname_bread
+  type: 2
   leanBackSitAnimation: 0
-  wholesalePrice: 0
-  defaultMarketPrice: 1000
-  productSalesRatio: 0
-  boxSize: 1
+  wholesalePrice: 2.4
+  defaultMarketPrice: 6
+  productSalesRatio: 0.75
+  boxSize: 500
   canPutInShoppingBasket: 0
   showBoxAsHandItem: 1
   defaultWorldSpaceKey: 
   itemPanelMetaView: 0
-  customColorChannels: 15
-  customizationColors:
-  - {r: 1, g: 0.9686275, b: 0.9215687, a: 0}
-  - {r: 0.87843144, g: 0.70980394, b: 0.4666667, a: 0}
-  - {r: 0.6313726, g: 0.39607847, b: 0.13333334, a: 0}
-  - {r: 0.3019608, g: 0.16078432, b: 0.06666667, a: 0}
-  - {r: 0.18039216, g: 0.18039216, b: 0.18039216, a: 0}
-  - {r: 0.9803922, g: 0.7058824, b: 0.29411766, a: 0}
-  - {r: 0.9294118, g: 0.2509804, b: 0.34117648, a: 0}
-  - {r: 0.59607846, g: 0.82745105, b: 0.38823533, a: 0}
-  - {r: 0.25490198, g: 0.58431375, b: 0.81568635, a: 0}
-  - {r: 0.9150943, g: 0.5740922, b: 0.8260428, a: 0}
-  isFurniture: 1
+  customColorChannels: 0
+  customizationColors: []
+  isFurniture: 0
   gridSize: 0.5
   degreesPerRotation: 45
   quality: 0
@@ -48,7 +38,7 @@ MonoBehaviour:
   furnitureRequirements: []
   wallMounted: 0
   snapToCeiling: 0
-  canBeGrabbed: 1
+  canBeGrabbed: 0
   stackType: 0
   itemsThatCanOverlapWith: []
   wallOverlapMargin: 0.1
@@ -75,13 +65,13 @@ MonoBehaviour:
   accessoryType: 0
   accessoryIcon: {fileID: 0}
   isReadable: 0
-  isADemandedProduct: 0
+  isADemandedProduct: 1
   limitDemandToNeighbourhoods: []
   isSpecialRivalOnly: 0
-  maxWholesaleOrderAmount: 5000
-  maxOrderAmountPerImporter: 5000
+  maxWholesaleOrderAmount: 3000
+  maxOrderAmountPerImporter: 15000
   providersNeededToStartGeneratingEvents: 7
-  usingAnimation: 34
+  usingAnimation: 30
   playerMountPosition: {x: 0, y: 0, z: 0}
   playerMountRotation: {x: 0, y: 0, z: 0}
   playGrabSound: 0

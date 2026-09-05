@@ -1,0 +1,148 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1001 &2610868329513946631
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: -5334523964814611563, guid: 25dcb6e0ac235d34c882357397f4f6d0,
+        type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -5334523964814611563, guid: 25dcb6e0ac235d34c882357397f4f6d0,
+        type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -5334523964814611563, guid: 25dcb6e0ac235d34c882357397f4f6d0,
+        type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -5334523964814611563, guid: 25dcb6e0ac235d34c882357397f4f6d0,
+        type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: -5334523964814611563, guid: 25dcb6e0ac235d34c882357397f4f6d0,
+        type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -5334523964814611563, guid: 25dcb6e0ac235d34c882357397f4f6d0,
+        type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -5334523964814611563, guid: 25dcb6e0ac235d34c882357397f4f6d0,
+        type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -5334523964814611563, guid: 25dcb6e0ac235d34c882357397f4f6d0,
+        type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -5334523964814611563, guid: 25dcb6e0ac235d34c882357397f4f6d0,
+        type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -5334523964814611563, guid: 25dcb6e0ac235d34c882357397f4f6d0,
+        type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 215537268903498359, guid: 25dcb6e0ac235d34c882357397f4f6d0,
+        type: 3}
+      propertyPath: m_Name
+      value: cookies
+      objectReference: {fileID: 0}
+    - target: {fileID: 3035781461699007921, guid: 25dcb6e0ac235d34c882357397f4f6d0,
+        type: 3}
+      propertyPath: m_Materials.Array.data[0]
+      value: 
+      objectReference: {fileID: 2100000, guid: 3959fd5dcf204e141823ee4e56073035, type: 2}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 215537268903498359, guid: 25dcb6e0ac235d34c882357397f4f6d0,
+        type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 3904148484131660555}
+  m_SourcePrefab: {fileID: 3150474306388093854, guid: 25dcb6e0ac235d34c882357397f4f6d0,
+    type: 3}
+--- !u!1 &2793943608366390384 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 215537268903498359, guid: 25dcb6e0ac235d34c882357397f4f6d0,
+    type: 3}
+  m_PrefabInstance: {fileID: 2610868329513946631}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &3904148484131660555
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2793943608366390384}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -194827119, guid: 8886001327901f6fdbae60e8ea6c53fd, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  primaryInteractionEnabled: 1
+  simpleOverlayType: 0
+  detailedOverlayType: 0
+  customOverlayHeaderKey: 
+  itemWarningIconOffset: {x: 0, y: 0, z: 0}
+  alwaysShowWarningIcon: 0
+  employeeNavMeshTargets: []
+  renderers: []
+  navMeshTargets: []
+  blockOutline: 0
+  itemName: cherryretail:itemname_cookies
+  alignmentTransform: {fileID: 0}
+  playerItemPurchaserSettings:
+    name: 
+    enabled: 0
+    itemName: 
+    itemQuantity: 1
+  collidersToDisableForOverlapping: []
+  extraVisualsParentObjects: []
+  applyAudioMixerGroup: 0
+  audioSourcesToApplyMixerGroup: []
+  allowResting: 0
+  ignoreSittingAngle: 0
+  sittingPositions: []
+  seatSpots: []
+  lHandIKAttachmentPoint: {fileID: 0}
+  rHandIKAttachmentPoint: {fileID: 0}
+  headIKAttachmentPoint: {fileID: 0}
+  colliders: []
+  navMeshObstacles: []
+  groundIndicators: []
+  directionIndicators: []
+  attachmentPoints: []
+  screenVideoController: {fileID: 0}
+  checkRenderersInChildren: 0
+  checkRenderersDepth: -1
+  shadowCasterPreserveMaterials: 0
+  shadowCasterRenderingLayerMask: 17
+  initialized: 0
+  onItemInitialized:
+    m_PersistentCalls:
+      m_Calls: []
+  childItemControllers: []
+  parentItemController: {fileID: 0}
+  parentAttachmentPoint: {fileID: 0}
+  customPositions: []
+  customColors: []
+  highlightChildrenOnHover: 0
+  customValue: 
+  blockDropdown: 0
