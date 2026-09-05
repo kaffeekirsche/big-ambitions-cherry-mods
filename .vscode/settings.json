@@ -5,12 +5,14 @@
         "**/.vs": true,
         "**/.gitmodules": true,
         "**/.vsconfig": true,
+
         "**/*.booproj": true,
         "**/*.pidb": true,
         "**/*.suo": true,
         "**/*.user": true,
         "**/*.userprefs": true,
         "**/*.unityproj": true,
+
         "**/*.dll": true,
         "**/*.exe": true,
         "**/*.pdf": true,
@@ -26,6 +28,7 @@
         "**/*.tga": true,
         "**/*.tif": true,
         "**/*.tiff": true,
+
         "**/*.3ds": true,
         "**/*.3DS": true,
         "**/*.fbx": true,
@@ -36,25 +39,34 @@
         "**/*.MA": true,
         "**/*.obj": true,
         "**/*.OBJ": true,
-        "**/*.asset": true,
-        "**/*.cubemap": true,
-        "**/*.flare": true,
-        "**/*.mat": true,
-        "**/*.meta": true,
-        "**/*.prefab": true,
-        "**/*.unity": true,
-        "build/": true,
-        "Build/": true,
+
         "Library/": true,
-        "library/": true,
+        "Temp/": true,
         "obj/": true,
-        "Obj/": true,
         "Logs/": true,
-        "logs/": true,
-        "ProjectSettings/": true,
-        "UserSettings/": true,
-        "temp/": true,
-        "Temp/": true
+        "Build/": true,
+        "Builds/": true
     },
+
+    "files.watcherExclude": {
+        "**/.git/objects/**": true,
+        "**/.git/subtree-cache/**": true,
+        "**/Library/**": true,
+        "**/Temp/**": true,
+        "**/obj/**": true,
+        "**/Logs/**": true,
+        "**/Build/**": true,
+        "**/Builds/**": true
+    },
+
+    "search.exclude": {
+        "**/Library/**": true,
+        "**/Temp/**": true,
+        "**/obj/**": true,
+        "**/Logs/**": true,
+        "**/Build/**": true,
+        "**/Builds/**": true
+    },
+
     "dotnet.defaultSolution": "03_Cherry Retail Pack.sln"
 }

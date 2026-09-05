@@ -19,6 +19,11 @@ namespace CherryQuickRid
 
         public string[] RelativeAssetBundlePaths => Array.Empty<string>();
 
+        /// <remarks>
+        /// AddSlider(id, label, min, max, defaultValue, onValueChanged, valueLabelKey) – nur int,
+        /// keine Schrittweite. Der onValueChanged-Callback feuert auch einmal beim Aufbau der UI mit
+        /// dem gespeicherten Wert; er ist damit zugleich der Lesepfad für persistierte Einstellungen.
+        /// </remarks>
         public Task OnLoadAsync(ModContext context)
         {
             _context = context;
@@ -31,6 +36,25 @@ namespace CherryQuickRid
                 .AddSlider("time_allowance", "quickrid_time_allowance", 100, 300,
                     QuickRidSettings.TimeAllowancePercent, v => QuickRidSettings.TimeAllowancePercent = v,
                     "quickrid_percent_value")
+                .AddHeader("quickrid_options_trip_header")
+                .AddSlider("request_wait_min", "quickrid_request_wait_min", 1, 120,
+                    QuickRidSettings.RequestWaitMinMinutes, v => QuickRidSettings.RequestWaitMinMinutes = v,
+                    "quickrid_minutes_value")
+                .AddSlider("request_wait_max", "quickrid_request_wait_max", 1, 240,
+                    QuickRidSettings.RequestWaitMaxMinutes, v => QuickRidSettings.RequestWaitMaxMinutes = v,
+                    "quickrid_minutes_value")
+                .AddSlider("offer_timeout", "quickrid_offer_timeout", 1, 120,
+                    QuickRidSettings.OfferTimeoutMinutes, v => QuickRidSettings.OfferTimeoutMinutes = v,
+                    "quickrid_minutes_value")
+                .AddSlider("passenger_search_radius", "quickrid_passenger_search_radius", 50, 1000,
+                    QuickRidSettings.PassengerSearchRadiusMeters, v => QuickRidSettings.PassengerSearchRadiusMeters = v,
+                    "quickrid_meters_value")
+                .AddSlider("pickup_radius", "quickrid_pickup_radius", 3, 25,
+                    QuickRidSettings.PickupRadiusMeters, v => QuickRidSettings.PickupRadiusMeters = v,
+                    "quickrid_meters_value")
+                .AddSlider("min_trip_distance", "quickrid_min_trip_distance", 100, 2000,
+                    QuickRidSettings.MinTripDistanceMeters, v => QuickRidSettings.MinTripDistanceMeters = v,
+                    "quickrid_meters_value")
                 .AddSlider("max_trip_distance", "quickrid_max_trip_distance", 300, 4000,
                     QuickRidSettings.MaxTripDistanceMeters, v => QuickRidSettings.MaxTripDistanceMeters = v,
                     "quickrid_meters_value")

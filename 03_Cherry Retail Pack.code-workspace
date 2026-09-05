@@ -1,7 +1,10 @@
 {
-    "folders": [
-        {
-            "path": "Assets/Mods/CherryRetailPack"
-        }
-    ]
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"dotnet.defaultSolution": "03_Cherry Retail Pack.sln"
+	}
 }
