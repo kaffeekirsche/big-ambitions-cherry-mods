@@ -28,8 +28,17 @@ namespace CherryQuickRid
         /// <summary>Umkreis um das Auto, in dem nach einem Abholpunkt gesucht wird, in Metern.</summary>
         public static int PassengerSearchRadiusMeters = 300;
 
-        /// <summary>Abstand, in dem das Auto zum Ein- und Aussteigen stehen muss, in Metern.</summary>
-        public static int PickupRadiusMeters = 8;
+        /// <summary>Abstand, in dem das Auto zum Einsteigen stehen muss, in Metern.</summary>
+        public static int PickupRadiusMeters = 10;
+
+        /// <summary>
+        /// Abstand zum Gebäudeeingang, in dem das Auto zum Absetzen stehen muss, in Metern.
+        /// </summary>
+        /// <remarks>
+        /// Getrennt vom Abholradius und ab Werk großzügiger: der Fahrgast steht beim Abholen direkt
+        /// an der Straße, das Ziel ist dagegen der Gebäudeeingang, der auch mal weiter zurückliegt.
+        /// </remarks>
+        public static int DropoffRadiusMeters = 10;
 
         /// <summary>Kürzeste Fahrtstrecke in Metern (Luftlinie Abholung → Ziel).</summary>
         public static int MinTripDistanceMeters = 300;

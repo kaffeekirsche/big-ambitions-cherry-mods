@@ -21,3 +21,4 @@
 - Keine neuen AssetBundles, solange nicht nötig (Icon kommt später).
 - Jede Stufe einzeln: Code → Build → Test im Spiel → erst dann nächste Stufe. Vor Game-API-Aufrufen Signatur in `_reference/GameSource~` prüfen.
 - Kein Umbau von CherryRetailPack, keine Änderungen an SDK-Beispielen.
+- Python-Tools (UnityPy, lz4 für das Lesen von Spiel-Assets) liegen im Projekt-Environment `.venv` – immer `.venv\Scripts\python.exe` bzw. `.venv\Scripts\pip.exe` benutzen, keine eigenen Installationen oder Ersatzlösungen bauen. Fehlende Pakete dort per pip nachinstallieren und hier notieren.

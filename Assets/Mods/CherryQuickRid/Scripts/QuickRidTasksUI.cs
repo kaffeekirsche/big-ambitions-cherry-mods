@@ -146,7 +146,8 @@ namespace CherryQuickRid
                 _previewLabel.SetData(new LanguageChangeEventDataHolder
                 {
                     Key = "quickrid_rating_preview",
-                    Arguments = new { stars = QuickRidRating.FormatStars(stars) }
+                    // Farbig, weil CreateAddressEntry für diese Zeile Rich Text einschaltet.
+                    Arguments = new { stars = QuickRidRating.FormatStarsColored(stars) }
                 });
             }
 

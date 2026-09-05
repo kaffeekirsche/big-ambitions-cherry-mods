@@ -36,9 +36,31 @@ namespace CherryQuickRid
         /// <summary>Trinkgeld pro Fahrt. Bleibt bis Stufe 6 (Trinkgeld-Mechanik) bei 0.</summary>
         private const float TipAmount = 0f;
 
-        /// <summary>Beschreibungs-Key der Auszahlung. EconoView hängt für die Typ-Spalte "_label" an.</summary>
-        private const string TransactionKey = "quickrid_transaction";
+        /// <summary>
+        /// Transaktionstyp der Auszahlung: bewusst der Vanilla-Typ des Angestelltengehalts, nicht ein
+        /// eigener Key.
+        /// </summary>
+        /// <remarks>
+        /// Die Onkel-Aufgabe „Verdiene $200 mit deinem Job" prüft über <c>Tutorial.HasEarnedMoney</c>
+        /// die gespeicherten Transaktionen und filtert dabei auf drei Typen:
+        /// <c>ba:transaction_playerjobsalary</c>, <c>ba:transaction_deliveryjobwage</c> und
+        /// <c>ba:transaction_fooddeliveryjobwage</c> (Asset <c>QuestFindAJobRequirementEarn200</c> im
+        /// Bundle <c>questfindajob</c>). Ein eigener Typ zählt dort nie mit, und die Bedingung ist
+        /// nicht erweiterbar – deshalb bucht QuickRid unter einem der drei.
+        /// <para>
+        /// Von den dreien nimmt nur dieser einen Platzhalter auf: „Gehalt von {businessName}". Mit
+        /// <see cref="TransactionBusinessName"/> steht QuickRid damit namentlich in der Buchung,
+        /// statt sie als Lieferjob auszugeben. Die Typ-Spalte in EconoView zeigt „Gehalt".
+        /// </para>
+        /// </remarks>
+        private const string TransactionKey = "ba:transaction_playerjobsalary";
         private const string TransactionCategory = "ba:transactioncategory_salaryincome";
+
+        /// <summary>
+        /// Wert für <c>{businessName}</c> in der Buchung. Bewusst ein Literal und kein Locale-Key:
+        /// der Wert landet im Spielstand und würde sonst die Sprache des Buchungszeitpunkts einfrieren.
+        /// </summary>
+        private const string TransactionBusinessName = "QuickRid";
 
         private const string ButtonName = "QuickRid - Job Button";
 
@@ -96,8 +118,17 @@ namespace CherryQuickRid
         private GameObject? _passengerRoot;
         private BaseHuman? _passenger;
         private LineRenderer? _pickupCircle;
-        private Material? _pickupMaterial;
         private bool _passengerSpawnFailed;
+
+        /// <summary>Ring am Ziel, sichtbar solange ein Fahrgast an Bord ist.</summary>
+        private GameObject? _dropoffRoot;
+        private LineRenderer? _dropoffCircle;
+
+        /// <summary>Gemeinsames Material beider Ringe. Wird erst in <see cref="OnDestroy"/> freigegeben.</summary>
+        private Material? _circleMaterial;
+
+        /// <summary>Merkt einen fehlgeschlagenen Ring-Aufbau, damit der Tick es nicht endlos wiederholt.</summary>
+        private bool _circleCreationFailed;
 
         /// <summary>Weltposition des wartenden Fahrgasts. Nur Laufzeit – siehe QuickRidMission.pickupAddress.</summary>
         private Vector3 _pickupPosition;
@@ -152,7 +183,7 @@ namespace CherryQuickRid
             _jobButtonLabel = null;
             _currentCar = null;
 
-            DestroyPassenger();
+            DestroyVisuals();
             GuidersManager.ResetGuider(DirectionGuiderType.JobDestination);
 
             _tasksUi?.Dispose();
@@ -182,12 +213,15 @@ namespace CherryQuickRid
             _jobButtonLabel = null;
             _colorsCaptured = false;
 
-            // Fahrgast, Kreis und Material hängen an der Stadt-Szene und sterben mit ihr.
+            // Fahrgast, Ringe und Material hängen an der Stadt-Szene und sterben mit ihr.
             _passengerRoot = null;
             _passenger = null;
             _pickupCircle = null;
-            _pickupMaterial = null;
+            _dropoffRoot = null;
+            _dropoffCircle = null;
+            _circleMaterial = null;
             _passengerSpawnFailed = false;
+            _circleCreationFailed = false;
         }
 
         private void Update()
@@ -243,13 +277,8 @@ namespace CherryQuickRid
                 mission.timeLimitMinutes = 0;
             }
 
-            if (mission != null && mission.state != QuickRidTripState.Waiting)
-            {
-                mission.ClearTrip();
-                mission.nextRequestTime = CreateWaitDeadline();
-                GuidersManager.ResetGuider(DirectionGuiderType.JobDestination);
-                _context?.Logger.Info("QuickRid: laufende Fahrt beim Laden abgebrochen.");
-            }
+            if (mission != null)
+                RestoreTrip(mission);
 
             if (_tasksUi != null && mission != null)
                 _tasksUi.Init();
@@ -257,6 +286,85 @@ namespace CherryQuickRid
             VehicleController current = VehicleHelper.GetCurrentVehicleBase();
             if (current != null)
                 OnEnterVehicle(current);
+        }
+
+        /// <summary>
+        /// Setzt die beim Speichern laufende Fahrt fort. Ein offenes Angebot wird verworfen – es war
+        /// ohnehin befristet und der Dialog stünde nach dem Laden ohne Zusammenhang da.
+        /// </summary>
+        /// <remarks>
+        /// Der wartende Fahrgast wird nicht an seiner alten Position wiederhergestellt, sondern neu an
+        /// der Tür seiner Abholadresse abgesetzt (die Position steht nicht im Spielstand, siehe
+        /// <see cref="QuickRidMission.pickupAddress"/>). Findet sich dort kein Platz auf dem NavMesh,
+        /// bricht die Fahrt ab wie vor Stufe 5.
+        /// </remarks>
+        private void RestoreTrip(QuickRidMission mission)
+        {
+            switch (mission.state)
+            {
+                case QuickRidTripState.Waiting:
+                    return;
+
+                case QuickRidTripState.Offered:
+                    mission.ClearTrip();
+                    mission.nextRequestTime = CreateWaitDeadline();
+                    GuidersManager.ResetGuider(DirectionGuiderType.JobDestination);
+                    _context?.Logger.Info("QuickRid: offenes Angebot beim Laden verworfen.");
+                    return;
+
+                case QuickRidTripState.PassengerWaiting:
+                    if (mission.pickupAddress == null)
+                        break;
+
+                    Transform door = BuildingHelper.GetAddressEntranceTransform(mission.pickupAddress);
+                    if (door == null || !TryResolvePickupSpot(door, out Vector3 position, out Quaternion rotation))
+                        break;
+
+                    _pickupPosition = position;
+                    _pickupRotation = rotation;
+
+                    ShowPassenger(_pickupPosition, _pickupRotation);
+                    PinPickup(mission);
+                    _context?.Logger.Info("QuickRid: wartender Fahrgast beim Laden wiederhergestellt.");
+                    return;
+
+                case QuickRidTripState.PassengerAboard:
+                    if (mission.destinationAddress == null)
+                        break;
+
+                    // Fahrgast sitzt im Auto: nur Kartenpin und Zielring fehlen. boardingTime und
+                    // damageAtBoarding stammen aus dem Spielstand und gelten unverändert weiter.
+                    GuidersManager.SetGuiderTarget(mission.destinationAddress, DirectionGuiderType.JobDestination);
+                    EnsureDropoffCircle(mission);
+                    _context?.Logger.Info("QuickRid: laufende Fahrt beim Laden fortgesetzt.");
+                    return;
+            }
+
+            AbortTrip(mission);
+            _context?.Logger.Warn("QuickRid: Fahrt beim Laden nicht wiederherstellbar – abgebrochen.");
+        }
+
+        /// <summary>
+        /// Sucht neben einer Gebäudetür einen Platz auf dem NavMesh, auf dem ein Fahrgast stehen kann.
+        /// Die Blickrichtung zeigt vom Gebäude weg zur Straße – er schaut nach dem Auto aus.
+        /// </summary>
+        private static bool TryResolvePickupSpot(Transform door, out Vector3 position, out Quaternion rotation)
+        {
+            position = default;
+            rotation = Quaternion.identity;
+
+            Vector3 sampleAt = door.position + door.forward * 0.5f;
+            if (!NavMesh.SamplePosition(sampleAt, out NavMeshHit hit, 2f, NavMeshHelper.NpcNavMeshFilter))
+                return false;
+
+            position = hit.position;
+
+            Vector3 facing = hit.position - door.position;
+            facing.y = 0f;
+            if (facing.sqrMagnitude > 0.001f)
+                rotation = Quaternion.LookRotation(facing);
+
+            return true;
         }
 
         // --- Fahrtanfrage und Fahrt ---------------------------------------------
@@ -335,6 +443,9 @@ namespace CherryQuickRid
                 return;
             }
 
+            // Vor den Fahrzeugprüfungen: der Ring soll schon während der Fahrt zu sehen sein.
+            EnsureDropoffCircle(mission);
+
             if (!IsDrivingMissionCar(mission) || _missionCar == null || !IsMissionCarStopped())
                 return;
 
@@ -342,7 +453,7 @@ namespace CherryQuickRid
             if (entrance == null)
                 return;
 
-            float radius = QuickRidSettings.PickupRadiusMeters;
+            float radius = QuickRidSettings.DropoffRadiusMeters;
             if ((_missionCar.transform.position - entrance.position).sqrMagnitude > radius * radius)
                 return;
 
@@ -367,13 +478,21 @@ namespace CherryQuickRid
             float fare = mission.fare;
             float tips = TipAmount;
 
-            GameManager.ChangeMoneySafe(fare + tips, new TransactionInfo(TransactionKey, TransactionCategory));
+            var transactionData = new Dictionary<string, string> { { "businessName", TransactionBusinessName } };
+            GameManager.ChangeMoneySafe(fare + tips, new TransactionInfo(TransactionKey, TransactionCategory, transactionData));
 
             QuickRidRating.Push(mission.GetRatingHistory(), stars);
             mission.completedTrips++;
             mission.totalEarnings += fare;
             mission.totalTips += tips;
             QuickRidStats.SaveFrom(mission);
+            HideDropoffCircle();
+
+            // Zähler dieser Sitzung für die Übersicht beim Offline-Gehen.
+            mission.sessionTrips++;
+            mission.sessionEarnings += fare;
+            mission.sessionTips += tips;
+            mission.sessionStarsTotal += stars;
 
             GuidersManager.ResetGuider(DirectionGuiderType.JobDestination);
             mission.ClearTrip();
@@ -397,6 +516,7 @@ namespace CherryQuickRid
         private void AbortTrip(QuickRidMission mission)
         {
             HidePassenger();
+            HideDropoffCircle();
             GuidersManager.ResetGuider(DirectionGuiderType.JobDestination);
             mission.ClearTrip();
             mission.nextRequestTime = CreateWaitDeadline();
@@ -490,19 +610,10 @@ namespace CherryQuickRid
                 if (candidate.door == null)
                     continue;
 
-                Vector3 sampleAt = candidate.door.position + candidate.door.forward * 0.5f;
-                if (!NavMesh.SamplePosition(sampleAt, out NavMeshHit hit, 2f, NavMeshHelper.NpcNavMeshFilter))
+                if (!TryResolvePickupSpot(candidate.door, out pickupPosition, out pickupRotation))
                     continue;
 
                 pickupAddress = candidate.address;
-                pickupPosition = hit.position;
-
-                // Blick vom Gebäude weg zur Straße – der Fahrgast schaut nach dem Auto aus.
-                Vector3 facing = hit.position - candidate.door.position;
-                facing.y = 0f;
-                if (facing.sqrMagnitude > 0.001f)
-                    pickupRotation = Quaternion.LookRotation(facing);
-
                 break;
             }
 
@@ -766,33 +877,110 @@ namespace CherryQuickRid
                 _passengerRoot.SetActive(false);
         }
 
-        private void DestroyPassenger()
+        /// <summary>Räumt Fahrgast, beide Ringe und das gemeinsame Material ab.</summary>
+        private void DestroyVisuals()
         {
             if (GameManager.isCitySceneBeingUnloaded)
                 return;
 
             if (_passengerRoot != null)
                 Destroy(_passengerRoot);
-            if (_pickupMaterial != null)
-                Destroy(_pickupMaterial);
+            if (_dropoffRoot != null)
+                Destroy(_dropoffRoot);
+            if (_circleMaterial != null)
+                Destroy(_circleMaterial);
 
             _passengerRoot = null;
             _passenger = null;
             _pickupCircle = null;
-            _pickupMaterial = null;
+            _dropoffRoot = null;
+            _dropoffCircle = null;
+            _circleMaterial = null;
         }
 
-        /// <summary>Ring in Pickup-Radius-Größe am Boden, damit die Abholzone sichtbar ist.</summary>
+        /// <summary>Ring in Abholradius-Größe am Boden, damit die Abholzone sichtbar ist.</summary>
         private void CreatePickupCircle(Transform parent)
+        {
+            _pickupCircle = CreateCircle("Pickup Area", parent);
+            UpdatePickupCircle();
+        }
+
+        private void UpdatePickupCircle()
+        {
+            UpdateCircle(_pickupCircle, QuickRidSettings.PickupRadiusMeters);
+        }
+
+        // --- Absetzzone ----------------------------------------------------------
+
+        /// <summary>
+        /// Stellt den Ring am Ziel sicher, solange ein Fahrgast an Bord ist. Steht er schon, kostet
+        /// der Aufruf nichts – deshalb darf er aus dem Frame-Tick kommen.
+        /// </summary>
+        /// <remarks>
+        /// Beim Zustandswechsel ist die Zieladresse nicht immer sofort auflösbar (das Gebäude kann
+        /// noch nicht bereitstehen). Der Ring entsteht deshalb beim ersten Tick, an dem
+        /// <c>GetAddressEntranceTransform</c> etwas liefert, und nicht einmalig beim Einsteigen.
+        /// </remarks>
+        private void EnsureDropoffCircle(QuickRidMission mission)
+        {
+            if (_dropoffRoot != null && _dropoffRoot.activeSelf)
+                return;
+
+            if (mission.destinationAddress == null)
+                return;
+
+            Transform entrance = BuildingHelper.GetAddressEntranceTransform(mission.destinationAddress);
+            if (entrance == null)
+                return;
+
+            ShowDropoffCircle(entrance.position);
+        }
+
+        private void ShowDropoffCircle(Vector3 position)
+        {
+            if (_circleCreationFailed)
+                return;
+
+            if (_dropoffRoot == null)
+            {
+                var root = new GameObject("QuickRid - Dropoff Area");
+                _dropoffCircle = CreateCircle("Dropoff Area", root.transform);
+
+                if (_dropoffCircle == null)
+                {
+                    Destroy(root);
+                    _circleCreationFailed = true;
+                    return;
+                }
+
+                root.SetActive(false);
+                _dropoffRoot = root;
+            }
+
+            _dropoffRoot.transform.position = position;
+            UpdateCircle(_dropoffCircle, QuickRidSettings.DropoffRadiusMeters);
+            _dropoffRoot.SetActive(true);
+        }
+
+        private void HideDropoffCircle()
+        {
+            if (_dropoffRoot != null)
+                _dropoffRoot.SetActive(false);
+        }
+
+        // --- Ringe ---------------------------------------------------------------
+
+        /// <summary>Flacher Ring am Boden in der QuickRid-Farbe. Radius setzt <see cref="UpdateCircle"/>.</summary>
+        private LineRenderer? CreateCircle(string name, Transform parent)
         {
             Shader shader = Shader.Find("Sprites/Default");
             if (shader == null)
             {
-                _context?.Logger.Warn("QuickRid: Shader \"Sprites/Default\" nicht gefunden – kein Abholkreis.");
-                return;
+                _context?.Logger.Warn("QuickRid: Shader \"Sprites/Default\" nicht gefunden – kein Ring.");
+                return null;
             }
 
-            var go = new GameObject("Pickup Area", typeof(LineRenderer));
+            var go = new GameObject(name, typeof(LineRenderer));
             go.transform.SetParent(parent, false);
             go.transform.localPosition = Vector3.up * 0.08f;
 
@@ -803,26 +991,25 @@ namespace CherryQuickRid
             line.startWidth = 0.12f;
             line.endWidth = 0.12f;
 
-            // Dieselbe Farbe wie der aktive Online-Button, damit beides als "QuickRid" lesbar ist.
-            _pickupMaterial = new Material(shader) { color = Colors.Lime };
-            line.sharedMaterial = _pickupMaterial;
+            // Dieselbe Farbe wie der aktive Online-Button, damit alles als "QuickRid" lesbar ist.
+            // Ein Material für beide Ringe; freigegeben wird es erst in OnDestroy.
+            if (_circleMaterial == null)
+                _circleMaterial = new Material(shader) { color = Colors.Lime };
 
-            _pickupCircle = line;
-            UpdatePickupCircle();
+            line.sharedMaterial = _circleMaterial;
+            return line;
         }
 
-        private void UpdatePickupCircle()
+        private static void UpdateCircle(LineRenderer? circle, float radius)
         {
-            if (_pickupCircle == null)
+            if (circle == null)
                 return;
 
-            float radius = QuickRidSettings.PickupRadiusMeters;
-            int count = _pickupCircle.positionCount;
-
+            int count = circle.positionCount;
             for (int i = 0; i < count; i++)
             {
                 float angle = i * Mathf.PI * 2f / count;
-                _pickupCircle.SetPosition(i, new Vector3(Mathf.Cos(angle) * radius, 0f, Mathf.Sin(angle) * radius));
+                circle.SetPosition(i, new Vector3(Mathf.Cos(angle) * radius, 0f, Mathf.Sin(angle) * radius));
             }
         }
 
@@ -1147,8 +1334,9 @@ namespace CherryQuickRid
             // Die Mission wird gleich gelöscht; Historie und Zähler überleben nur in modData.
             QuickRidStats.SaveFrom(mission);
 
-            // Fahrgast und Kartenpin gehören zur Schicht – beides muss mit ihr verschwinden.
+            // Fahrgast, Ringe und Kartenpin gehören zur Schicht – alles muss mit ihr verschwinden.
             HidePassenger();
+            HideDropoffCircle();
             GuidersManager.ResetGuider(DirectionGuiderType.JobDestination);
             _offerDialogOpen = false;
 
@@ -1156,6 +1344,9 @@ namespace CherryQuickRid
             _tasksUi?.Hide();
             UpdateJobButton();
             _context?.Logger.Info("QuickRid: driver offline.");
+
+            // Erst ganz zum Schluss: die Übersicht belegt den Missions-Slot kurzzeitig selbst.
+            QuickRidSessionSummary.Show(mission, _context?.Logger);
         }
     }
 }

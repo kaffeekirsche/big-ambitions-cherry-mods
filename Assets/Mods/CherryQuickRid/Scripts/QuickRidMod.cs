@@ -52,6 +52,9 @@ namespace CherryQuickRid
                 .AddSlider("pickup_radius", "quickrid_pickup_radius", 3, 25,
                     QuickRidSettings.PickupRadiusMeters, v => QuickRidSettings.PickupRadiusMeters = v,
                     "quickrid_meters_value")
+                .AddSlider("dropoff_radius", "quickrid_dropoff_radius", 3, 30,
+                    QuickRidSettings.DropoffRadiusMeters, v => QuickRidSettings.DropoffRadiusMeters = v,
+                    "quickrid_meters_value")
                 .AddSlider("min_trip_distance", "quickrid_min_trip_distance", 100, 2000,
                     QuickRidSettings.MinTripDistanceMeters, v => QuickRidSettings.MinTripDistanceMeters = v,
                     "quickrid_meters_value")

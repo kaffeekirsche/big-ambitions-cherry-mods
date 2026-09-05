@@ -39,9 +39,10 @@ namespace CherryQuickRid
 
         /// <summary>Adresse, an der der Fahrgast wartet. Null, solange keine Anfrage offen ist.</summary>
         /// <remarks>
-        /// Die konkrete Weltposition des Fahrgasts wird absichtlich nicht gespeichert: Stufe 3 bricht
-        /// eine laufende Fahrt beim Laden ab (siehe IDEEN.md), die Position würde also nie gebraucht.
-        /// Erst die Wiederherstellung in Stufe 5 braucht hier eine SerializableVector3.
+        /// Die Weltposition des Fahrgasts wird bewusst nicht gespeichert: beim Laden bestimmt
+        /// <c>QuickRidController.RestoreState</c> sie aus dieser Adresse neu (Gebäudetür plus
+        /// NavMesh-Sample). Der Fahrgast steht dann eventuell ein Stück neben seinem alten Platz,
+        /// dafür bleibt der Spielstand frei von Positionsdaten.
         /// </remarks>
         public Address? pickupAddress;
 
@@ -91,6 +92,24 @@ namespace CherryQuickRid
 
         /// <summary>Trinkgeld insgesamt. Bleibt bis Stufe 6 immer 0.</summary>
         public float totalTips;
+
+        // --- Zähler dieser Online-Sitzung -------------------------------------------------------
+        // Getrennt von der dauerhaften Statistik oben: sie beginnen bei jedem Online-Gehen bei 0 und
+        // speisen die Übersicht beim Offline-Gehen (siehe QuickRidSessionSummary). Gezählt werden nur
+        // abgeschlossene Fahrten – ein Abbruch mit Fahrgast an Bord schlägt sich allein in der
+        // Rating-Historie nieder.
+
+        /// <summary>Abgeschlossene Fahrten seit dem Online-Gehen.</summary>
+        public int sessionTrips;
+
+        /// <summary>Ausgezahlte Fahrpreise seit dem Online-Gehen.</summary>
+        public float sessionEarnings;
+
+        /// <summary>Trinkgeld seit dem Online-Gehen. Bleibt bis Stufe 6 immer 0.</summary>
+        public float sessionTips;
+
+        /// <summary>Summe der vergebenen Sterne dieser Sitzung; geteilt durch <see cref="sessionTrips"/> der Schnitt.</summary>
+        public int sessionStarsTotal;
 
         /// <summary>
         /// Sterne der letzten <see cref="QuickRidRating.HistoryLength"/> Fahrten, älteste zuerst.

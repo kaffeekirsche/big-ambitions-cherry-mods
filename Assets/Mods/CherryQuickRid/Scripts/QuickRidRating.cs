@@ -1,6 +1,7 @@
 #nullable enable
 using System.Collections.Generic;
 using System.Globalization;
+using System.Text;
 using UnityEngine;
 
 namespace CherryQuickRid
@@ -43,6 +44,10 @@ namespace CherryQuickRid
         /// <summary>Sterne-Zeichen der Vorschau im Aufgabenpanel.</summary>
         private const char FilledStar = '★';
         private const char EmptyStar = '☆';
+
+        /// <summary>Farben der Sterne-Vorschau: Gold für vergebene, Grau für offene Sterne.</summary>
+        private const string FilledStarColor = "FFD700";
+        private const string EmptyStarColor = "808080";
 
         /// <summary>
         /// Erwartete Fahrzeit in Spielminuten: Grundzeit plus Luftlinie Abholung → Ziel.
@@ -122,6 +127,35 @@ namespace CherryQuickRid
         {
             int filled = Mathf.Clamp(stars, 0, 5);
             return new string(FilledStar, filled) + new string(EmptyStar, 5 - filled);
+        }
+
+        /// <summary>Dieselben Sterne mit TMP-Farbmarkierung, für Labels mit Rich Text.</summary>
+        /// <remarks>
+        /// Nur für Zeilen aus <c>MissionTasksUI.CreateAddressEntry</c> geeignet: die schaltet
+        /// <c>richText</c> ein, und Vanilla setzt dort selbst Farbmarkierungen
+        /// (<c>FormatAddressWithDistance</c>). In einer Benachrichtigung oder im Log stünde sonst der
+        /// rohe Markup-Text.
+        /// </remarks>
+        public static string FormatStarsColored(int stars)
+        {
+            int filled = Mathf.Clamp(stars, 0, 5);
+
+            var builder = new StringBuilder(64);
+            if (filled > 0)
+            {
+                builder.Append("<color=#").Append(FilledStarColor).Append('>');
+                builder.Append(FilledStar, filled);
+                builder.Append("</color>");
+            }
+
+            if (filled < 5)
+            {
+                builder.Append("<color=#").Append(EmptyStarColor).Append('>');
+                builder.Append(EmptyStar, 5 - filled);
+                builder.Append("</color>");
+            }
+
+            return builder.ToString();
         }
 
         /// <summary>Schnitt mit einer Dezimalstelle, kulturunabhängig; "–" ohne bewertete Fahrt.</summary>

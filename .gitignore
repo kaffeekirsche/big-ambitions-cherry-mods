@@ -9,7 +9,6 @@
 *.csproj.user
 *.DotSettings.user
 TestResults/
-docs/
 tmp_decompile/
 
 # Mod Builder packaged outputs
@@ -56,8 +55,10 @@ Assets/Mods/LIB_BaComputerGames/
 
 _reference/
 CLAUDE.md.meta
-MCG_Doom~
+Assets/Mods/MCG_Doom~/
 
 !CLAUDE.md
 !Assets/Mods/CherryRetailPack/**/*.md
 !Assets/Mods/CherryQuickRid/**/*.md
+
+.venv/
