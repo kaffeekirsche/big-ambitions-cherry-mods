@@ -23,6 +23,22 @@ namespace CherryQuickRid
         public const bool DeveloperMode = false;
 
         /// <summary>
+        /// Blendet den Melden-Knopf in der Adresszeile des Aufgabenpanels ein, mit dem sich die
+        /// gerade angefahrene Adresse dauerhaft sperren lässt.
+        /// </summary>
+        /// <remarks>
+        /// Betrifft nur die Schaltfläche. Die Sperrliste selbst, ihre JSON-Datei, die
+        /// Standardeinträge und der Zurücksetzen-Knopf im Optionsmenü arbeiten unverändert weiter;
+        /// eine von Hand oder in einer früheren Sitzung gesperrte Adresse bleibt gesperrt.
+        /// <para>
+        /// Der Knopf ist ausnutzbar: er bricht die Fahrt ohne Sternabzug ab und ist damit ein
+        /// bequemerer Ausweg als das Offline-Gehen mit Fahrgast, das einen Stern kostet. Diese
+        /// Konstante macht ihn abschaltbar, ohne die Sperrliste aufzugeben.
+        /// </para>
+        /// </remarks>
+        public const bool EnableExcludeButton = true;
+
+        /// <summary>
         /// Auswahl aus dem Dropdown „Schwierigkeit". Setzt Fahrpreis, Zeitpuffer und Trinkgeld über
         /// <see cref="QuickRidDifficulty.Apply"/>.
         /// </summary>

@@ -1412,8 +1412,18 @@ namespace CherryQuickRid
         }
 
         /// <summary>Bestätigungsdialog des Ausschluss-Buttons im Aufgabenpanel.</summary>
+        /// <remarks>
+        /// Ohne <see cref="QuickRidSettings.EnableExcludeButton"/> passiert hier nichts. Das
+        /// Aufgabenpanel legt den Knopf dann zwar gar nicht erst an, der Riegel steht aber auch
+        /// hier: die Methode ist öffentlich und der einzige Weg in die Sperrliste hinein.
+        /// </remarks>
         public void PromptExcludeAddress()
         {
+            // Je nach Konstante hält der Compiler das return oder alles dahinter für unerreichbar.
+#pragma warning disable CS0162
+            if (!QuickRidSettings.EnableExcludeButton)
+                return;
+
             QuickRidMission? mission = Mission;
             Address? address = GetExcludableAddress();
             if (mission == null || address == null || HudConfirm.isOpen)
@@ -1431,6 +1441,7 @@ namespace CherryQuickRid
                 "quickrid_exclude_confirm",
                 "quickrid_decline_job",
                 false);
+#pragma warning restore CS0162
         }
 
         /// <summary>
