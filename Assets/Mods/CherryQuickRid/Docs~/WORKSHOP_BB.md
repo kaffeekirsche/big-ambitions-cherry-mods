@@ -1,17 +1,16 @@
-
-[size=6][b]QuickRid – Ride Service Job[/b][/size]
+[b]QuickRid – Ride Service Job[/b]
 
 [hr]
 
-[size=5][b]English[/b][/size]
+[b]English[/b]
 
 
-[size=4][b]QuickRid – Ride Service Job[/b][/size]
+[b]QuickRid – Ride Service Job[/b]
 
 Drive people around town in your own car. QuickRid is a fourth entry-level job next to the cash register, food delivery and the delivery driver. There is no depot, no company car and no shift: you go online, take a few rides, and go offline whenever you want.
 
 
-[size=4][b]What it does[/b][/size]
+[b]What it does[/b]
 
 [list]
 [*][b]Go online from your own car.[/b] A button appears next to "Park" in the vehicle panel while
@@ -33,12 +32,12 @@ running average feeds back into the fares you are offered.
 [*][b]Counts as a job.[/b] QuickRid satisfies your uncle's "find a job" task, and its earnings
 count towards "earn $200 with your job".[/list]
 
-[size=4][b]Requirements[/b][/size]
+[b]Requirements[/b]
 
 You need a car of your own. QuickRid never spawns or lends you a vehicle, and it does not work in a rental, a company car or someone else's vehicle.
 
 
-[size=4][b]Difficulty[/b][/size]
+[b]Difficulty[/b]
 
 One dropdown in Options → Mods sets fare, time window and tip chance together:
 
@@ -48,22 +47,22 @@ One dropdown in Options → Mods sets fare, time window and tip chance together:
 [*][b]Normal[/b] – the baseline.
 [*][b]Hard[/b] – lower fares, tight time windows, rare tips.[/list]
 
-[size=4][b]Blocked addresses[/b][/size]
+[b]Blocked addresses[/b]
 
 Some doors in the city cannot sensibly be reached by car. While a ride is running, the button on the address line in the task panel reports the address: the ride ends without costing you a star, and that address is never offered again. The list is stored outside your save, so it carries over to every game. You can clear it again in Options → Mods.
 
 
-[size=4][b]Languages[/b][/size]
+[b]Languages[/b]
 
 English, German, Czech, Danish, Spanish, French, Italian, Polish, Korean. The mod follows your game language; anything missing falls back to English. More languages on request.
 
 
-[size=4][b]Before you uninstall: go offline[/b][/size]
+[b]Before you uninstall: go offline[/b]
 
 While you are online, a QuickRid job sits inside your save file. Without the mod installed the game no longer knows that job and loading the save can stumble. Go offline first, then save, then remove the mod.
 
 
-[size=4][b]A note on your books[/b][/size]
+[b]A note on your books[/b]
 
 QuickRid pays out under the game's own player salary transaction type and shows up in EconoView as "Salary from QuickRid". That is deliberate: it is the only way the "earn $200 with your job" task recognises the money. If you also hold a regular employee job, both land in the same salary row of your books.
 
@@ -71,15 +70,15 @@ QuickRid pays out under the game's own player salary transaction type and shows 
 
 [hr]
 
-[size=5][b]Deutsch[/b][/size]
+[b]Deutsch[/b]
 
 
-[size=4][b]QuickRid – Fahrdienst[/b][/size]
+[b]QuickRid – Fahrdienst[/b]
 
 Fahre mit dem eigenen Auto Leute durch die Stadt. QuickRid ist ein vierter Einstiegsjob neben Kasse, Essenslieferung und Botenfahrten. Kein Depot, kein Firmenwagen, keine Schicht: Du gehst online, nimmst ein paar Fahrten mit und gehst offline, wann du willst.
 
 
-[size=4][b]Was die Mod kann[/b][/size]
+[b]Was die Mod kann[/b]
 
 [list]
 [*][b]Online gehen im eigenen Auto.[/b] Im Fahrzeug-Panel erscheint neben "Parken" ein Knopf,
@@ -102,12 +101,12 @@ Durchschnitt der Sitzung.
 [*][b]Zählt als Job.[/b] QuickRid erfüllt die Aufgabe "Such dir einen Job", und die Einnahmen
 zählen für "Verdiene 200 $ mit deinem Job".[/list]
 
-[size=4][b]Voraussetzung[/b][/size]
+[b]Voraussetzung[/b]
 
 Du brauchst ein eigenes Auto. QuickRid stellt dir keines hin und leiht dir keines; in einem Mietwagen, Firmenwagen oder fremden Fahrzeug funktioniert der Job nicht.
 
 
-[size=4][b]Schwierigkeit[/b][/size]
+[b]Schwierigkeit[/b]
 
 Ein Dropdown unter Optionen → Mods stellt Fahrpreis, Zeitfenster und Trinkgeld-Chance gemeinsam ein:
 
@@ -117,24 +116,23 @@ Ein Dropdown unter Optionen → Mods stellt Fahrpreis, Zeitfenster und Trinkgeld
 [*][b]Normal[/b] – der Ausgangswert.
 [*][b]Schwer[/b] – niedrigere Fahrpreise, knappe Zeitfenster, selten Trinkgeld.[/list]
 
-[size=4][b]Gesperrte Adressen[/b][/size]
+[b]Gesperrte Adressen[/b]
 
 Manche Türen in der Stadt sind mit dem Auto nicht sinnvoll erreichbar. Während einer Fahrt meldest du die Adresse über den Knopf in der Adresszeile des Aufgabenpanels: Die Fahrt endet ohne Sternabzug, und die Adresse wird nie wieder angeboten. Die Liste liegt außerhalb des Spielstands und gilt deshalb für alle Spielstände. Zurücksetzen kannst du sie unter Optionen → Mods.
 
 
-[size=4][b]Sprachen[/b][/size]
+[b]Sprachen[/b]
 
 Englisch, Deutsch, Tschechisch, Dänisch, Spanisch, Französisch, Italienisch, Polnisch, Koreanisch. Die Mod folgt der Spielsprache; Fehlendes fällt auf Englisch zurück. Weitere Sprachen auf Anfrage.
 
 
-[size=4][b]Vor dem Deinstallieren: offline gehen[/b][/size]
+[b]Vor dem Deinstallieren: offline gehen[/b]
 
 Solange du online bist, liegt ein QuickRid-Auftrag in deinem Spielstand. Ohne die Mod kennt das Spiel diesen Auftrag nicht mehr, und der Spielstand kann beim Laden stolpern. Erst offline gehen, dann speichern, dann die Mod entfernen.
 
 
-[size=4][b]Hinweis zur Buchhaltung[/b][/size]
+[b]Hinweis zur Buchhaltung[/b]
 
 QuickRid zahlt über den Gehaltstyp des Spiels aus und erscheint in EconoView als "Gehalt von QuickRid". Das ist Absicht: nur so erkennt die Aufgabe "Verdiene 200 $ mit deinem Job" das Geld. Wer zusätzlich einen normalen Angestelltenjob hat, findet beides in derselben Gehaltszeile der Buchhaltung wieder.
 
 [i]Logo, Banner und Kartensymbol wurden mit KI-Bildwerkzeugen erstellt und von Hand nachbearbeitet. Code und Gameplay sind von Hand gebaut und getestet.[/i]
-
