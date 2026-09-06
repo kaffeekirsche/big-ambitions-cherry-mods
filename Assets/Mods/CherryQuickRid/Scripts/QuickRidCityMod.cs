@@ -1,5 +1,4 @@
 #nullable enable
-using System;
 using System.Threading.Tasks;
 using BAModAPI;
 using UnityEngine;
@@ -16,16 +15,20 @@ namespace CherryQuickRid
     {
         private static GameObject? _controllerObject;
 
-        public string[] RelativeAssetBundlePaths => Array.Empty<string>();
+        public string[] RelativeAssetBundlePaths => new[] { QuickRidAssets.BundleKey };
 
         public Task OnLoadAsync(ModContext context)
         {
             if (_controllerObject == null)
             {
+                // Das Kartensymbol kommt aus dem AssetBundle; fehlt es, nimmt der Filter das
+                // Symbol des Vanilla-Lieferjobs.
+                Sprite? mapIcon = QuickRidAssets.LoadMapIcon(context);
+
                 _controllerObject = new GameObject("QuickRid - Controller");
                 UnityEngine.Object.DontDestroyOnLoad(_controllerObject);
                 var controller = _controllerObject.AddComponent<QuickRidController>();
-                controller.Initialize(context);
+                controller.Initialize(context, mapIcon);
             }
 
             context.Logger.Info("QuickRid city mod loaded.");

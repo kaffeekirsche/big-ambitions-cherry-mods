@@ -17,7 +17,6 @@ namespace CherryQuickRid
     /// <c>ModOptions.AddButton</c> nimmt zwar einen Locale-Key entgegen, die gerenderte Schaltfläche
     /// zeigt aber einen Platzhalter („YOUR TEXT HERE") statt des Textes – der Key landet nur auf der
     /// Beschriftung der Zeile, nicht auf dem Knopf. Diese Klasse setzt den Knopftext nach.
-    /// Vorlage: TaxiOptionsUiFixer in _reference/BeATaxi~.
     /// <para>
     /// Es gibt kein Ereignis für „Optionsbildschirm geöffnet": <c>OptionsService.OnChanged</c> feuert
     /// nur beim Registrieren und Entfernen, die Steuerelemente entstehen aber erst beim Öffnen des

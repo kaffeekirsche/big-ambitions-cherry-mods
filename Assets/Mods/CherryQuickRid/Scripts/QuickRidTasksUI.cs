@@ -12,7 +12,7 @@ namespace CherryQuickRid
 {
     /// <summary>
     /// Eintrag im Aufgabenpanel, solange der Spieler online ist.
-    /// Vorlage: _reference/BeATaxi~/BeATaxi/TaxiTasksUI.cs
+    /// Vorbild: das Aufgabenpanel des Vanilla-Lieferjobs.
     /// </summary>
     /// <remarks>
     /// Die Basisklasse pollt alle 0,3 s und ruft selbst <c>Hide()</c>, sobald im Missions-Slot
@@ -190,8 +190,8 @@ namespace CherryQuickRid
 
         /// <remarks>
         /// CreateTimeEntry blendet Checkmark und DestinationButton selbst aus und verdrahtet den
-        /// CloseButton mit <see cref="OnClickCancelJob"/>. Anders als Be A Taxi lassen wir diesen
-        /// Button sichtbar – er ist unser "Offline gehen".
+        /// CloseButton mit <see cref="OnClickCancelJob"/>. Anders als im Vanilla-Lieferjob bleibt
+        /// dieser Button sichtbar – er ist unser "Offline gehen".
         /// <para>
         /// Die Adresszeile wird hier einmal angelegt und danach nur noch ein- und ausgeblendet.
         /// Ein zweiter <c>CreateTasksGroup</c>-Aufruf würde eine zusätzliche Gruppe erzeugen, weil
@@ -248,9 +248,7 @@ namespace CherryQuickRid
         /// </summary>
         /// <remarks>
         /// Das Aufgabenpanel kennt nur zwei Zeilenvorlagen und keinen Text-Button; der vorhandene
-        /// Button ist deshalb der einzige Platz für eine Aktion an der Adresse. Vorlage:
-        /// TaxiTasksUI in _reference/BeATaxi~, das den gleichen Button für "Ziel neu anheften"
-        /// benutzt.
+        /// Button ist deshalb der einzige Platz für eine Aktion an der Adresse.
         /// <para>
         /// <c>onClick</c> wird <em>ersetzt</em>, nicht ergänzt: <c>RemoveAllListeners</c> räumt nur
         /// die zur Laufzeit hinzugefügten Zuhörer ab, nicht die aus dem Prefab.
@@ -305,7 +303,7 @@ namespace CherryQuickRid
 
             other.Hide();
             other.enabled = false;
-            _controller.Logger?.Info(
+            QuickRidLog.Dev(_controller.Logger,
                 $"QuickRid: Tooltip-Typ {other.GetType().Name} am Ausschluss-Button unbekannt – abgeschaltet.");
         }
 
@@ -324,7 +322,7 @@ namespace CherryQuickRid
             Image? targetIcon = FindIcon(destinationButton, "DestinationButton", logger);
             if (targetIcon == null)
             {
-                logger?.Info("QuickRid: kein Symbolbild am Ausschluss-Button gefunden – Kartenpin bleibt.");
+                QuickRidLog.Dev(logger, "QuickRid: kein Symbolbild am Ausschluss-Button gefunden – Kartenpin bleibt.");
                 return;
             }
 
@@ -334,12 +332,12 @@ namespace CherryQuickRid
             if (closeButton != null)
                 sourceIcon = FindIcon(closeButton, "CloseButton", logger);
             else
-                logger?.Info("QuickRid: CloseButton in der Zeilenvorlage nicht gefunden.");
+                QuickRidLog.Dev(logger, "QuickRid: CloseButton in der Zeilenvorlage nicht gefunden.");
 
             Sprite? sprite = sourceIcon != null ? sourceIcon.sprite : FindFallbackCrossSprite(logger);
             if (sprite == null)
             {
-                logger?.Info("QuickRid: kein X-Symbol gefunden – Kartenpin bleibt am Ausschluss-Button.");
+                QuickRidLog.Dev(logger, "QuickRid: kein X-Symbol gefunden – Kartenpin bleibt am Ausschluss-Button.");
                 return;
             }
 
@@ -356,7 +354,7 @@ namespace CherryQuickRid
                 targetIcon.preserveAspect = true;
             }
 
-            logger?.Info($"QuickRid: Ausschluss-Button zeigt jetzt \"{sprite.name}\".");
+            QuickRidLog.Dev(logger, $"QuickRid: Ausschluss-Button zeigt jetzt \"{sprite.name}\".");
         }
 
         /// <summary>Der Schließen-Button der oberen Zeilenvorlage – dort sitzt das X.</summary>
@@ -379,7 +377,8 @@ namespace CherryQuickRid
         /// </summary>
         /// <remarks>
         /// Jeder Fund wird protokolliert: ohne Einsicht ins Prefab ist das Log die einzige
-        /// Möglichkeit, die tatsächliche Struktur der Zeile zu erfahren.
+        /// Möglichkeit, die tatsächliche Struktur der Zeile zu erfahren. Das ist Diagnose und
+        /// erscheint deshalb nur im Entwicklermodus (siehe <see cref="QuickRidLog"/>).
         /// </remarks>
         private static Image? FindIcon(Transform buttonTransform, string label, IModLogger? logger)
         {
@@ -398,7 +397,7 @@ namespace CherryQuickRid
                     continue;
 
                 bool isBackground = ReferenceEquals(image, background);
-                logger?.Info($"QuickRid: {label} -> Bild \"{image.transform.name}\", " +
+                QuickRidLog.Dev(logger, $"QuickRid: {label} -> Bild \"{image.transform.name}\", " +
                     $"Sprite \"{(image.sprite != null ? image.sprite.name : "-")}\", Hintergrund: {isBackground}");
 
                 if (image.transform.name == "Icon" && named == null)
@@ -450,12 +449,12 @@ namespace CherryQuickRid
                     continue;
 
                 _fallbackCrossSprite = sprite;
-                logger?.Info($"QuickRid: Ersatz-Symbol \"{sprite.name}\" aus den geladenen Sprites gewählt " +
+                QuickRidLog.Dev(logger, $"QuickRid: Ersatz-Symbol \"{sprite.name}\" aus den geladenen Sprites gewählt " +
                     $"({sprites.Length} durchsucht).");
                 return sprite;
             }
 
-            logger?.Info($"QuickRid: kein X-artiges Sprite unter {sprites.Length} geladenen gefunden.");
+            QuickRidLog.Dev(logger, $"QuickRid: kein X-artiges Sprite unter {sprites.Length} geladenen gefunden.");
             return null;
         }
 

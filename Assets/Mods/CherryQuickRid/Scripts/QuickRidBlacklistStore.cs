@@ -100,10 +100,13 @@ namespace CherryQuickRid
             }
         }
 
-        /// <summary>Einmalige Zeile fürs Log, damit der Speicherort im Fehlerfall nachvollziehbar ist.</summary>
+        /// <summary>
+        /// Einmalige Zeile fürs Log, damit der Speicherort im Fehlerfall nachvollziehbar ist.
+        /// Diagnose: der Pfad interessiert nur beim Nachstellen eines Fehlers.
+        /// </summary>
         public static void LogLocation(ModContext context, IModLogger? logger)
         {
-            logger?.Info(
+            QuickRidLog.Dev(logger,
                 $"QuickRid: Sperrliste liegt unter {GetFullPath(context.ModId)} " +
                 $"(persistentDataPath: {Application.persistentDataPath}, " +
                 $"ModId: \"{context.ModId}\" -> Ordner \"{ToFolderName(context.ModId)}\", " +
@@ -178,7 +181,7 @@ namespace CherryQuickRid
                     return false;
                 }
 
-                logger?.Info($"QuickRid: Sperrliste gespeichert – {file.entries.Count} Einträge, " +
+                QuickRidLog.Dev(logger, $"QuickRid: Sperrliste gespeichert – {file.entries.Count} Einträge, " +
                     $"{info.Length} Bytes, {path}");
                 return true;
             }

@@ -16,7 +16,7 @@ namespace CherryQuickRid
     /// Anders als Vanilla ist das Trinkgeld kein fester Betrag, sondern ein Anteil des Fahrpreises,
     /// und die Chance hängt an den Sternen dieser Fahrt: 5 Sterne volle Chance, 4 Sterne halbe,
     /// darunter nichts. Die Vanilla-Tabellenwerte liegen nur im Asset, nicht im Code – die Werte
-    /// hier sind eigene (siehe IDEEN.md, Stufe 6a).
+    /// hier sind eigene (siehe Docs~/IDEEN.md, Stufe 6a).
     /// </para>
     /// </remarks>
     public static class QuickRidTips

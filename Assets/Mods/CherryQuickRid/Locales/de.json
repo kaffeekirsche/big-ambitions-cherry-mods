@@ -23,6 +23,7 @@
   "quickrid_percent_value": "{value} %",
   "quickrid_meters_value": "{value} m",
   "quickrid_minutes_value": "{value} min",
+  "quickrid_map_filter": "QuickRid",
   "quickrid_job_title": "QuickRid-Fahrer",
   "quickrid_go_online": "Online gehen",
   "quickrid_start_job": "Mit dem eigenen Auto als QuickRid-Fahrer online gehen?",

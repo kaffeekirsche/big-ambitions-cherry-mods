@@ -13,10 +13,10 @@ MonoBehaviour:
   m_Name: ModManifest
   m_EditorClassIdentifier: 
   ModId: CherryQuickRid
-  DisplayName: QuickRid
+  DisplayName: QuickRid – Ride Service Job
   Author: Kaffeekirsche
-  Version: 0.1.0
-  AssetBundleName: 
+  Version: 1.0.0
+  AssetBundleName: quickrid.unity3d
   ModAssembly: {fileID: 5897886265953266890, guid: c3379f7e50b441d2945bf75e0cf43099, type: 3}
   LocalesFolder: {fileID: 102900000, guid: 1dc32fecb1074bccbbaeaf20150ca911, type: 3}
   DependenciesFolder: {fileID: 0}

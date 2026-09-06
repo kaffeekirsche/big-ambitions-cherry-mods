@@ -15,7 +15,7 @@ namespace CherryQuickRid
     /// <remarks>
     /// Das Aussehen wird bewusst nur einmal je Instanz gewürfelt: <c>AppearanceSetter.UpdateVisuals</c>
     /// lässt den SkinnedMeshCombiner (Fremdcode ohne Quelle) ein Runtime-Mesh bauen, und ob ein
-    /// erneutes Würfeln das alte freigibt, ist nicht nachprüfbar (siehe IDEEN.md, Stufe 3).
+    /// erneutes Würfeln das alte freigibt, ist nicht nachprüfbar (siehe Docs~/IDEEN.md, Stufe 3).
     /// Alle Instanzen hängen unter einem Root in der Stadt-Szene; beim Stadtverlassen zerstört die
     /// Szene sie, dann genügt <see cref="ForgetSceneObjects"/>.
     /// </remarks>

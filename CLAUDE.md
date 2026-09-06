@@ -6,7 +6,7 @@
 
 ## Mods in diesem Projekt
 - `Assets/Mods/CherryRetailPack` – fertige Retail-Mod (Bäckerei, Tierfutter, Apotheke). **Nicht anfassen**, nur als Strukturvorlage lesen.
-- `Assets/Mods/CherryQuickRid` – neue Fahrdienst-Mod "QuickRid" (aktuelles Projekt). Stufenplan in `IDEEN.md` dort.
+- `Assets/Mods/CherryQuickRid` – neue Fahrdienst-Mod "QuickRid" (aktuelles Projekt). Stufenplan und Workshop-Text liegen in `Assets/Mods/CherryQuickRid/Docs~/` (`IDEEN.md`, `WORKSHOP.md`) – der Tilde-Ordner hält interne Notizen aus dem AssetBundle heraus.
 
 ## Referenzen (Ordner mit `~` werden von Unity ignoriert)
 - `_reference/BeATaxi~` – decompilierte Workshop-Mod "Be A Taxi" (NOSTY); Vorlage für Fahrgast-Spawn, Mission, Abrechnung.

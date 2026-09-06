@@ -9,7 +9,7 @@ namespace CherryQuickRid
     /// <summary>
     /// Laufende QuickRid-Schicht inklusive der aktuellen Fahrt. Liegt als <see cref="PlayerMission"/>
     /// im Missions-Slot <c>SaveGameManager.Current.currentPlayerMission</c> und wird mit dem
-    /// Spielstand gespeichert. Vorlage: _reference/BeATaxi~/BeATaxi/TaxiMission.cs
+    /// Spielstand gespeichert. Vorbild: DeliveryDriverMission im Vanilla-Lieferjob.
     /// </summary>
     /// <remarks>
     /// <see cref="PlayerMission"/> hat keine abstrakten Member – die Klasse ist ein reiner Datenbehälter.

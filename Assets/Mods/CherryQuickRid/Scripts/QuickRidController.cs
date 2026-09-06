@@ -24,15 +24,15 @@ namespace CherryQuickRid
 {
     /// <summary>
     /// Zentrale Laufzeitlogik: Online/Offline, Auftragsgenerierung, Fahrgast, Ankunft, Abrechnung.
-    /// Stufenplan siehe IDEEN.md. Vorlage für die Game-API: _reference/BeATaxi~ (TaxiShiftController)
-    /// und _reference/BeATaxi_API-Analyse.md.
+    /// Stufenplan siehe Docs~/IDEEN.md. Vorbild: der Vanilla-Lieferjob
+    /// (DeliveryJobStartController, DeliveryJobVehicle in _reference/GameSource~).
     /// </summary>
     public sealed class QuickRidController : MonoBehaviour
     {
         /// <summary>
         /// So weit liegt <c>endTime</c> der Schicht in der Zukunft. Ein Fahrdienst hat keine Schicht;
         /// <c>PlayerMission.IsOngoing()</c> ist aber nicht virtual, also bleibt nur eine Frist, die nie
-        /// abläuft. Kein Spielcode wertet die Frist einer fremden Missionsklasse aus (siehe IDEEN.md).
+        /// abläuft. Kein Spielcode wertet die Frist einer fremden Missionsklasse aus (Docs~/IDEEN.md).
         /// </summary>
         private const int OpenEndDays = 3650;
 
@@ -106,6 +106,9 @@ namespace CherryQuickRid
         private ModContext? _context;
         private QuickRidTasksUI? _tasksUi;
 
+        /// <summary>Kartenfilter in der Kategorie Jobs samt Kartenpunkt der laufenden Fahrt.</summary>
+        private QuickRidMapFilter? _mapFilter;
+
         private Button? _jobButton;
         private TextLocalizationComponent? _jobButtonLabel;
         private CarController? _currentCar;
@@ -171,9 +174,14 @@ namespace CherryQuickRid
         /// <summary>Log der Mod, auch für <see cref="QuickRidTasksUI"/>.</summary>
         public IModLogger? Logger => _context?.Logger;
 
-        public void Initialize(ModContext context)
+        /// <param name="mapIcon">
+        /// Symbol des Kartenfilters aus dem AssetBundle; null lässt den Filter auf das Symbol des
+        /// Vanilla-Lieferjobs zurückfallen.
+        /// </param>
+        public void Initialize(ModContext context, Sprite? mapIcon)
         {
             _context = context;
+            _mapFilter = new QuickRidMapFilter(context.Logger, mapIcon);
         }
 
         private void Start()
@@ -203,6 +211,8 @@ namespace CherryQuickRid
             DestroyVisuals();
             GuidersManager.ResetGuider(DirectionGuiderType.JobDestination);
 
+            _mapFilter?.Destroy();
+
             _tasksUi?.Dispose();
             _tasksUi = null;
         }
@@ -231,8 +241,10 @@ namespace CherryQuickRid
             _jobButtonLabel = null;
             _colorsCaptured = false;
 
-            // Fahrgäste, Ringe und Material hängen an der Stadt-Szene und sterben mit ihr.
+            // Fahrgäste, Ringe, Kartenfilter und Material hängen an der Stadt-Szene und sterben
+            // mit ihr.
             _passengers.ForgetSceneObjects();
+            _mapFilter?.ForgetSceneObjects();
             _pickupRoot = null;
             _pickupCircle = null;
             _dropoffRoot = null;
@@ -248,6 +260,9 @@ namespace CherryQuickRid
 
             if (!InstanceBehavior<CityManager>.IsInitialized)
                 return;
+
+            // Der Kartenfilter steht auch offline in der Liste – deshalb vor dem Missions-Guard.
+            _mapFilter?.Tick();
 
             QuickRidMission? mission = Mission;
             if (mission == null)
@@ -275,7 +290,7 @@ namespace CherryQuickRid
         /// <summary>
         /// Nach dem Laden eines Spielstands: Aufgabenpanel wiederherstellen und den Button nachziehen,
         /// falls der Spieler bereits im Auto sitzt (dann ist onEnterVehicle schon durch).
-        /// Eine laufende Fahrt wird abgebrochen – ihre Wiederherstellung ist Stufe 5 (siehe IDEEN.md).
+        /// Eine laufende Fahrt wird abgebrochen – ihre Wiederherstellung ist Stufe 5 (Docs~/IDEEN.md).
         /// Der Abbruch kostet keinen Stern: er ist eine technische Einschränkung, keine Entscheidung
         /// des Spielers.
         /// </summary>
@@ -333,6 +348,7 @@ namespace CherryQuickRid
                     mission.ClearTrip();
                     mission.nextRequestTime = CreateWaitDeadline();
                     GuidersManager.ResetGuider(DirectionGuiderType.JobDestination);
+                    _mapFilter?.Clear();
                     _context?.Logger.Info("QuickRid: offenes Angebot beim Laden verworfen.");
                     return;
 
@@ -349,6 +365,7 @@ namespace CherryQuickRid
 
                     ShowPassenger(_pickupPosition, _pickupRotation);
                     PinPickup(mission);
+                    _mapFilter?.ShowPickup(_pickupPosition, mission.pickupAddress);
                     _context?.Logger.Info("QuickRid: wartender Fahrgast beim Laden wiederhergestellt.");
                     return;
 
@@ -360,6 +377,7 @@ namespace CherryQuickRid
                     // damageAtBoarding stammen aus dem Spielstand und gelten unverändert weiter.
                     GuidersManager.SetGuiderTarget(mission.destinationAddress, DirectionGuiderType.JobDestination);
                     EnsureDropoffCircle(mission);
+                    _mapFilter?.ShowDestination(mission.destinationAddress);
                     _context?.Logger.Info("QuickRid: laufende Fahrt beim Laden fortgesetzt.");
                     return;
             }
@@ -453,7 +471,10 @@ namespace CherryQuickRid
             HidePassenger();
 
             if (mission.destinationAddress != null)
+            {
                 GuidersManager.SetGuiderTarget(mission.destinationAddress, DirectionGuiderType.JobDestination);
+                _mapFilter?.ShowDestination(mission.destinationAddress);
+            }
 
             // Ab hier läuft die bewertete Fahrzeit; Schaden zählt nur als Zuwachs ab jetzt.
             mission.boardingTime = TimeHelper.Now();
@@ -491,8 +512,7 @@ namespace CherryQuickRid
 
         /// <summary>
         /// Fahrgast abgesetzt: Sterne berechnen, Fahrpreis auszahlen, Statistik fortschreiben.
-        /// Vorlage für die Auszahlung: CompleteShift in _reference/BeATaxi~/BeATaxi/TaxiShiftController.cs
-        /// und Vanilla DeliveryJobVehicle.GiveEarningsAndReset.
+        /// Vorbild für die Auszahlung: DeliveryJobVehicle.GiveEarningsAndReset im Vanilla-Lieferjob.
         /// </summary>
         /// <remarks>
         /// Ausgezahlt wird <c>mission.fare</c> unverändert – der Rating-Modifier steckt seit der Anfrage
@@ -529,6 +549,7 @@ namespace CherryQuickRid
             mission.sessionStarsTotal += stars;
 
             GuidersManager.ResetGuider(DirectionGuiderType.JobDestination);
+            _mapFilter?.Clear();
             mission.ClearTrip();
             mission.nextRequestTime = CreateWaitDeadline();
 
@@ -543,9 +564,12 @@ namespace CherryQuickRid
             _context?.Logger.Info(
                 $"QuickRid: Fahrt abgeschlossen – {elapsedMinutes:0}/{allowedMinutes:0} min" +
                 $"{(fast ? " (schnell)" : string.Empty)}, Tarif {mission.tariffPeriod}, " +
-                $"Schaden {damageTaken:0.000}, {stars} Sterne, ${fare:0} + ${tips:0} Trinkgeld " +
-                $"(Wurf {tipRoll:0.000} gegen Chance {tipChance:0.000}, Anteil {share:0.00}), " +
+                $"Schaden {damageTaken:0.000}, {stars} Sterne, ${fare:0} + ${tips:0} Trinkgeld, " +
                 $"Schnitt {QuickRidRating.FormatAverage(mission.GetRatingHistory())}.");
+
+            QuickRidLog.Dev(_context?.Logger,
+                $"QuickRid: Trinkgeld-Wurf {tipRoll:0.000} gegen wirksame Chance {tipChance:0.000}, " +
+                $"Anteil {share:0.00} des Fahrpreises.");
 
             _tasksUi?.UpdateUI();
         }
@@ -555,6 +579,7 @@ namespace CherryQuickRid
             HidePassenger();
             HideDropoffCircle();
             GuidersManager.ResetGuider(DirectionGuiderType.JobDestination);
+            _mapFilter?.Clear();
             mission.ClearTrip();
             mission.nextRequestTime = CreateWaitDeadline();
             _tasksUi?.UpdateUI();
@@ -754,6 +779,7 @@ namespace CherryQuickRid
 
             ShowPassenger(_pickupPosition, _pickupRotation);
             PinPickup(mission);
+            _mapFilter?.ShowPickup(_pickupPosition, mission.pickupAddress);
 
             mission.tripStartTime = TimeHelper.Now();
             mission.offerExpiryTime = null;
@@ -923,7 +949,7 @@ namespace CherryQuickRid
             _addressCandidates = list;
             _addressCacheReady = true;
 
-            _context?.Logger.Info(
+            QuickRidLog.Dev(_context?.Logger,
                 $"QuickRid: {list.Count} von {checkedDoors} Türen liegen höchstens " +
                 $"{QuickRidSettings.RoadProximityMeters:0} m von einer befahrbaren Straße entfernt " +
                 $"({rejected} verworfen).");
@@ -1216,7 +1242,6 @@ namespace CherryQuickRid
         /// <remarks>
         /// Klon des vanilla "Parken"-Buttons, direkt daneben einsortiert. Der geklonte Button bringt den
         /// Park-Listener mit – deshalb muss onClick komplett ersetzt und nicht nur ergänzt werden.
-        /// Vorlage: EnsureFinishShiftButton in _reference/BeATaxi~/BeATaxi/TaxiShiftController.cs
         /// </remarks>
         private void EnsureJobButton()
         {
@@ -1532,6 +1557,7 @@ namespace CherryQuickRid
             HidePassenger();
             HideDropoffCircle();
             GuidersManager.ResetGuider(DirectionGuiderType.JobDestination);
+            _mapFilter?.Clear();
             _offerDialogOpen = false;
 
             SaveGameManager.Current.currentPlayerMission = null;

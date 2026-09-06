@@ -15,8 +15,7 @@ namespace CherryQuickRid
 {
     /// <summary>
     /// Zusammenfassung einer Online-Sitzung beim Offline-Gehen. Nutzt die Tagesübersicht des
-    /// Vanilla-Lieferjobs und beschriftet deren Zeilen um.
-    /// Vorlage: ShowNativeShiftSummary in _reference/BeATaxi~/BeATaxi/TaxiShiftController.cs
+    /// Vanilla-Lieferjobs (DeliveryJobSummary) und beschriftet deren Zeilen um.
     /// </summary>
     /// <remarks>
     /// <c>DeliveryJobSummary</c> liest seine Zahlen aus <c>SaveGameManager.Current.currentPlayerMission</c>

@@ -47,7 +47,7 @@ namespace CherryQuickRid
             // Die Feinjustierung ist Entwicklerwerkzeug und bleibt dem Spieler erspart. Der Block
             // ist per Konstante abgeschaltet, deshalb hält der Compiler ihn für unerreichbar.
 #pragma warning disable CS0162
-            if (QuickRidSettings.DeveloperOptions)
+            if (QuickRidSettings.DeveloperMode)
             {
                 options
                     .AddHeader("quickrid_options_developer_header")

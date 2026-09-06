@@ -11,14 +11,16 @@ namespace CherryQuickRid
         public const string ModDataPrefix = "quickrid:";
 
         /// <summary>
-        /// Blendet die Feinjustierung (Wartezeiten, Radien, Streckenlängen) im Optionsmenü ein.
+        /// Schaltet Entwicklerwerkzeug frei: die Feinjustierung (Wartezeiten, Radien,
+        /// Streckenlängen) im Optionsmenü und die Diagnose-Ausgaben im Log.
         /// </summary>
         /// <remarks>
-        /// Für Spieler steht dort nur die Schwierigkeit; die Einzelwerte sind Werkzeug für die
-        /// Entwicklung und würden das Menü sonst zumüllen. Bewusst eine Konstante und kein Schalter:
-        /// wer sie braucht, baut die Mod ohnehin selbst.
+        /// Für Spieler steht im Menü nur die Schwierigkeit; die Einzelwerte sind Werkzeug für die
+        /// Entwicklung und würden das Menü sonst zumüllen. Ebenso im Log: Betriebsmeldungen bleiben
+        /// immer stehen, innerer Zustand nur hier (siehe <see cref="QuickRidLog"/>). Bewusst eine
+        /// Konstante und kein Schalter: wer sie braucht, baut die Mod ohnehin selbst.
         /// </remarks>
-        public const bool DeveloperOptions = false;
+        public const bool DeveloperMode = false;
 
         /// <summary>
         /// Auswahl aus dem Dropdown „Schwierigkeit". Setzt Fahrpreis, Zeitpuffer und Trinkgeld über
