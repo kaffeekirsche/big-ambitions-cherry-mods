@@ -1,0 +1,140 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -189057480, guid: 8886001327901f6fdbae60e8ea6c53fd, type: 3}
+  m_Name: CherryRestaurant
+  m_EditorClassIdentifier: 
+  database: {fileID: 0}
+  tags:
+  - ba:businesstag_allowplayercreation
+  - ba:businesstag_generatesrevenue
+  - ba:businesstag_customersneedpaperbags
+  businessTypeName: cherryrestaurant:businesstype_cherryrestaurant
+  suitableBuildingType: ba:buildingtype_retail
+  simulator: {fileID: 11400000, guid: 99cd390d55f125840b47e5c768e7401f, type: 2}
+  spawnCustomers: 1
+  courseRequired: 0
+  minutesToCheckBeforeTheSpawnTimeInAiBusinesses: 60
+  spawnCustomersOnlyOnEnter: 0
+  acceptCustomersWithoutOrderEntries: 0
+  hasEntranceFee: 0
+  defaultEntranceFee: 
+  hasWeekendOnlyEntranceFee: 0
+  weekendOnlyEntranceFee: 
+  callDialogType: 0
+  icon: {fileID: 21300000, guid: 8d1f633ea59e4ca19587ae54eb571cdb, type: 3}
+  cityMapFilterColor: {r: 0.549, g: 0.098, b: 0.176, a: 1}
+  businessProducts:
+  - itemName: cherryrestaurant:itemname_pizza
+    impact: 1
+  - itemName: ba:itemname_pizza
+    impact: 1
+  - itemName: ba:itemname_kabob
+    impact: 1
+  - itemName: ba:itemname_salad
+    impact: 1
+  - itemName: ba:itemname_bottleofwine
+    impact: 1
+  - itemName: ba:itemname_beer
+    impact: 1
+  - itemName: ba:itemname_martini
+    impact: 1
+  - itemName: ba:itemname_margarita
+    impact: 1
+  - itemName: ba:itemname_icecream
+    impact: 1
+  - itemName: ba:itemname_whisky
+    impact: 0.8
+  - itemName: ba:itemname_cheeseplatter
+    impact: 0.7
+  - itemName: ba:itemname_cupcake
+    impact: 0.5
+  - itemName: ba:itemname_sodacan
+    impact: 0.4
+  - itemName: ba:itemname_frenchfries
+    impact: 0.3
+  productSources:
+  - ba:businessproductsource_wholesaler
+  employeePrimarySkills:
+  - ba:skill_customerservice
+  employeeDefaultAppearanceTags: 02000000
+  customerType: 1
+  maxAmountPerProduct: 5
+  businessRequirements:
+  - {fileID: 11400000, guid: 7135a8080aa9ab043b20ac0f438b60d2, type: 2}
+  - {fileID: 11400000, guid: 99f04b3bcd794ec468b24296766dceaa, type: 2}
+  uniforms: []
+  customerDemandSets:
+  - type: ba:customerdemand_music
+    weight: 1
+  - type: ba:customerdemand_employeeuniforms
+    weight: 1
+  - type: ba:customerdemand_interiordesign
+    weight: 1
+  - type: ba:customerdemand_seating
+    weight: 1
+  - type: ba:customerdemand_toilet
+    weight: 1
+  - type: ba:customerdemand_toiletprivacy
+    weight: 1
+  - type: ba:customerdemand_sink
+    weight: 1
+  logoShapes:
+  - fastfood1
+  - fastfood2
+  - fastfood3
+  - fastfood4
+  dayFactorMultipliers:
+  - dayOfWeekOrdered: 1
+    multiplier: 0.6
+  - dayOfWeekOrdered: 2
+    multiplier: 0.65
+  - dayOfWeekOrdered: 3
+    multiplier: 0.7
+  - dayOfWeekOrdered: 4
+    multiplier: 0.8
+  - dayOfWeekOrdered: 5
+    multiplier: 0.95
+  - dayOfWeekOrdered: 6
+    multiplier: 1
+  - dayOfWeekOrdered: 7
+    multiplier: 0.85
+  hourlyFactorMultipliers:
+  - startingHour: 0
+    endingHour: 6
+    multiplier: 0.05
+  - startingHour: 6
+    endingHour: 11
+    multiplier: 0.1
+  - startingHour: 11
+    endingHour: 14
+    multiplier: 0.55
+  - startingHour: 14
+    endingHour: 17
+    multiplier: 0.2
+  - startingHour: 17
+    endingHour: 19
+    multiplier: 0.85
+  - startingHour: 19
+    endingHour: 22
+    multiplier: 1
+  - startingHour: 22
+    endingHour: 24
+    multiplier: 0.45
+  aliases:
+  - Restaurant
+  - Bistro
+  - Trattoria
+  hasPedestriansOutside: 0
+  pedestrianPool: {fileID: 0}
+  hasMusicOutside: 0
+  radioVolume: 0.15
+  radioStation: 3
