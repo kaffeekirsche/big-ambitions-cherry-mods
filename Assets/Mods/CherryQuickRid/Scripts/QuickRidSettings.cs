@@ -10,11 +10,30 @@ namespace CherryQuickRid
         public const string LocalePrefix = "quickrid_";
         public const string ModDataPrefix = "quickrid:";
 
-        /// <summary>Fahrpreis-Multiplikator in Prozent (100 = 1,0x).</summary>
+        /// <summary>
+        /// Blendet die Feinjustierung (Wartezeiten, Radien, Streckenlängen) im Optionsmenü ein.
+        /// </summary>
+        /// <remarks>
+        /// Für Spieler steht dort nur die Schwierigkeit; die Einzelwerte sind Werkzeug für die
+        /// Entwicklung und würden das Menü sonst zumüllen. Bewusst eine Konstante und kein Schalter:
+        /// wer sie braucht, baut die Mod ohnehin selbst.
+        /// </remarks>
+        public const bool DeveloperOptions = false;
+
+        /// <summary>
+        /// Auswahl aus dem Dropdown „Schwierigkeit". Setzt Fahrpreis, Zeitpuffer und Trinkgeld über
+        /// <see cref="QuickRidDifficulty.Apply"/>.
+        /// </summary>
+        public static QuickRidDifficultyChoice DifficultyChoice = QuickRidDifficultyChoice.MatchGame;
+
+        /// <summary>Fahrpreis-Multiplikator in Prozent (100 = 1,0x). Kommt aus der Schwierigkeit.</summary>
         public static int FareMultiplierPercent = 100;
 
         /// <summary>Zeitpuffer in Prozent auf die berechnete Fahrzeit (Basis für die Sternebewertung).</summary>
         public static int TimeAllowancePercent = 150;
+
+        /// <summary>Trinkgeld-Chance in Prozent (100 = Tabellenwerte aus <see cref="QuickRidTips"/> unverändert).</summary>
+        public static int TipChancePercent = 100;
 
         /// <summary>Kürzeste Wartezeit auf die nächste Anfrage, in Spielminuten.</summary>
         public static int RequestWaitMinMinutes = 15;
@@ -46,7 +65,21 @@ namespace CherryQuickRid
         /// <summary>Maximale Fahrtstrecke in Metern (Luftlinie Abholung → Ziel).</summary>
         public static int MaxTripDistanceMeters = 1500;
 
+        /// <summary>
+        /// So nah muss eine Gebäudetür an einem befahrbaren Straßenpunkt liegen, damit die Adresse
+        /// überhaupt als Abholung oder Ziel infrage kommt.
+        /// </summary>
+        /// <remarks>
+        /// Konstante statt Slider: der Wert wirkt nur beim einmaligen Aufbau des Adress-Caches
+        /// (<c>QuickRidController.BuildAddressCacheRoutine</c>), eine Änderung zur Laufzeit würde
+        /// also erst beim nächsten Stadtladen greifen und im Optionsmenü nur verwirren.
+        /// </remarks>
+        public const float RoadProximityMeters = 15f;
+
         public static float FareMultiplier => FareMultiplierPercent / 100f;
         public static float TimeAllowance => TimeAllowancePercent / 100f;
+
+        /// <summary>Skalierung der Trinkgeld-Chancen; 1,0 = Tabellenwerte.</summary>
+        public static float TipChance => TipChancePercent / 100f;
     }
 }

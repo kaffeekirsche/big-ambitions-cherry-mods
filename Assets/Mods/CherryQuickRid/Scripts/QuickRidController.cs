@@ -1,12 +1,15 @@
 #nullable enable
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using BAModAPI;
 using BigAmbitions.DayNightCycle;
 using BigAmbitions.PlacementSystem;
 using Buildings.Outdoors;
 using Extensions;
+using GleyTrafficSystem;
 using Helpers;
+using Localizor;
 using Localizor.LanguageChangeEvent;
 using Streets;
 using UI;
@@ -32,9 +35,6 @@ namespace CherryQuickRid
         /// abläuft. Kein Spielcode wertet die Frist einer fremden Missionsklasse aus (siehe IDEEN.md).
         /// </summary>
         private const int OpenEndDays = 3650;
-
-        /// <summary>Trinkgeld pro Fahrt. Bleibt bis Stufe 6 (Trinkgeld-Mechanik) bei 0.</summary>
-        private const float TipAmount = 0f;
 
         /// <summary>
         /// Transaktionstyp der Auszahlung: bewusst der Vanilla-Typ des Angestelltengehalts, nicht ein
@@ -65,14 +65,6 @@ namespace CherryQuickRid
         private const string ButtonName = "QuickRid - Job Button";
 
         /// <summary>
-        /// Vanilla-Prefab für stehende NPCs (Verkäufer am Stand). Bewusst nicht
-        /// "Characters/HumanDefinitionLow" wie in der Be-A-Taxi-Vorlage: das ist ein
-        /// <c>ThirdPersonCharacter</c> mit Update-Schleife, NavMeshAgent und Rigging, die ein
-        /// wartender Fahrgast alle nicht braucht. Muster: SellerStandController.Start().
-        /// </summary>
-        private const string PassengerPrefab = "Characters/DummyHuman";
-
-        /// <summary>
         /// Fahrpreisformel, eingeordnet zwischen die beiden Vanilla-Einstiegsjobs.
         /// </summary>
         /// <remarks>
@@ -97,6 +89,18 @@ namespace CherryQuickRid
         /// <summary>So viele Türen werden pro Anfrage höchstens auf dem NavMesh probiert.</summary>
         private const int PickupSampleAttempts = 10;
 
+        /// <summary>
+        /// So viele Gebäude prüft der Cache-Aufbau pro Frame. Jede Prüfung scannt alle Waypoints
+        /// der Stadt, deshalb wird der Aufbau über mehrere Frames verteilt.
+        /// </summary>
+        private const int AddressCacheBuildingsPerFrame = 8;
+
+        /// <summary>
+        /// Ab diesem Anteil verworfener Türen warnt das Log: dann ist vermutlich
+        /// <see cref="QuickRidSettings.RoadProximityMeters"/> zu streng und nicht die Stadt schuld.
+        /// </summary>
+        private const float AddressCacheRejectWarnRatio = 0.5f;
+
         private const int PickupCircleSegments = 72;
 
         private ModContext? _context;
@@ -115,10 +119,15 @@ namespace CherryQuickRid
         private CarController? _missionCar;
         private Rigidbody? _missionCarBody;
 
-        private GameObject? _passengerRoot;
-        private BaseHuman? _passenger;
+        /// <summary>Mehrere Fahrgäste mit je eigenem Aussehen; pro Fahrt wird einer gezogen.</summary>
+        private readonly QuickRidPassengerPool _passengers = new QuickRidPassengerPool();
+
+        /// <summary>
+        /// Ring an der Abholung. Eigener Root statt eines Kindes des Fahrgasts: welcher Fahrgast
+        /// aus dem Pool gerade dasteht, wechselt von Fahrt zu Fahrt.
+        /// </summary>
+        private GameObject? _pickupRoot;
         private LineRenderer? _pickupCircle;
-        private bool _passengerSpawnFailed;
 
         /// <summary>Ring am Ziel, sichtbar solange ein Fahrgast an Bord ist.</summary>
         private GameObject? _dropoffRoot;
@@ -140,6 +149,11 @@ namespace CherryQuickRid
         /// <summary>Alle anfahrbaren Gebäudetüren, einmal pro Stadtladen aufgebaut.</summary>
         private List<AddressCandidate>? _addressCandidates;
 
+        /// <summary>Erst wenn der Aufbau durch ist, dürfen Anfragen entstehen.</summary>
+        private bool _addressCacheReady;
+
+        private Coroutine? _addressCacheRoutine;
+
         private readonly List<AddressCandidate> _nearbyBuffer = new List<AddressCandidate>();
         private readonly List<AddressCandidate> _destinationBuffer = new List<AddressCandidate>();
 
@@ -153,6 +167,9 @@ namespace CherryQuickRid
         /// <summary>Die laufende Schicht, oder null wenn der Spieler offline ist.</summary>
         private static QuickRidMission? Mission =>
             SaveGameManager.Current?.currentPlayerMission as QuickRidMission;
+
+        /// <summary>Log der Mod, auch für <see cref="QuickRidTasksUI"/>.</summary>
+        public IModLogger? Logger => _context?.Logger;
 
         public void Initialize(ModContext context)
         {
@@ -200,6 +217,7 @@ namespace CherryQuickRid
         {
             _tasksUi?.Dispose();
 
+            StopAddressCacheBuild();
             _addressCandidates = null;
             _nearbyBuffer.Clear();
             _destinationBuffer.Clear();
@@ -213,14 +231,13 @@ namespace CherryQuickRid
             _jobButtonLabel = null;
             _colorsCaptured = false;
 
-            // Fahrgast, Ringe und Material hängen an der Stadt-Szene und sterben mit ihr.
-            _passengerRoot = null;
-            _passenger = null;
+            // Fahrgäste, Ringe und Material hängen an der Stadt-Szene und sterben mit ihr.
+            _passengers.ForgetSceneObjects();
+            _pickupRoot = null;
             _pickupCircle = null;
             _dropoffRoot = null;
             _dropoffCircle = null;
             _circleMaterial = null;
-            _passengerSpawnFailed = false;
             _circleCreationFailed = false;
         }
 
@@ -264,6 +281,13 @@ namespace CherryQuickRid
         /// </summary>
         private void RestoreState()
         {
+            // "Wie Spiel" lässt sich erst hier auflösen: beim Registrieren der Options gibt es noch
+            // keinen Spielstand, und die Schwierigkeit kann sich im laufenden Spiel noch ändern.
+            if (QuickRidSettings.DifficultyChoice == QuickRidDifficultyChoice.MatchGame)
+                QuickRidDifficulty.Apply(_context?.Logger);
+
+            StartAddressCacheBuild();
+
             QuickRidMission? mission = Mission;
 
             if (mission != null)
@@ -375,6 +399,11 @@ namespace CherryQuickRid
             if (!IsDrivingMissionCar(mission) || _missionCar == null)
                 return;
 
+            // Während der Cache baut, bleibt eine abgelaufene Frist stehen: sonst würde jeder Tick
+            // sie neu setzen und die erste Anfrage käme viel später als gedacht.
+            if (!_addressCacheReady)
+                return;
+
             if (mission.nextRequestTime == null)
             {
                 mission.nextRequestTime = CreateWaitDeadline();
@@ -476,7 +505,12 @@ namespace CherryQuickRid
 
             int stars = QuickRidRating.CalculateStars(elapsedMinutes, allowedMinutes, damageTaken);
             float fare = mission.fare;
-            float tips = TipAmount;
+
+            // Ein Wurf je Fahrt nach dem Muster von DeliveryJobTipsConfig.RollTip, zusätzlich an die
+            // Sterne dieser Fahrt gekoppelt (unter 4 Sternen gibt es nie Trinkgeld).
+            bool fast = QuickRidTips.IsFastTrip(elapsedMinutes, allowedMinutes);
+            float share = QuickRidTips.Roll(fast, stars, out float tipRoll, out float tipChance);
+            float tips = QuickRidTips.ToAmount(fare, share);
 
             var transactionData = new Dictionary<string, string> { { "businessName", TransactionBusinessName } };
             GameManager.ChangeMoneySafe(fare + tips, new TransactionInfo(TransactionKey, TransactionCategory, transactionData));
@@ -507,8 +541,11 @@ namespace CherryQuickRid
                 });
 
             _context?.Logger.Info(
-                $"QuickRid: Fahrt abgeschlossen – {elapsedMinutes:0}/{allowedMinutes:0} min, " +
-                $"Schaden {damageTaken:0.000}, {stars} Sterne, ${fare:0}, Schnitt {QuickRidRating.FormatAverage(mission.GetRatingHistory())}.");
+                $"QuickRid: Fahrt abgeschlossen – {elapsedMinutes:0}/{allowedMinutes:0} min" +
+                $"{(fast ? " (schnell)" : string.Empty)}, Tarif {mission.tariffPeriod}, " +
+                $"Schaden {damageTaken:0.000}, {stars} Sterne, ${fare:0} + ${tips:0} Trinkgeld " +
+                $"(Wurf {tipRoll:0.000} gegen Chance {tipChance:0.000}, Anteil {share:0.00}), " +
+                $"Schnitt {QuickRidRating.FormatAverage(mission.GetRatingHistory())}.");
 
             _tasksUi?.UpdateUI();
         }
@@ -573,8 +610,8 @@ namespace CherryQuickRid
         /// </summary>
         private bool TryCreateRequest(QuickRidMission mission, Vector3 origin)
         {
-            List<AddressCandidate> candidates = GetAddressCandidates();
-            if (candidates.Count == 0)
+            List<AddressCandidate>? candidates = _addressCandidates;
+            if (!_addressCacheReady || candidates == null || candidates.Count == 0)
                 return false;
 
             float searchRadius = QuickRidSettings.PassengerSearchRadiusMeters;
@@ -586,6 +623,12 @@ namespace CherryQuickRid
                 AddressCandidate candidate = candidates[i];
                 if (candidate.door == null)
                     continue;
+
+                // Sperrliste erst hier statt beim Cache-Aufbau: so wirken ein gemeldeter Ausschluss
+                // und das Zurücksetzen sofort, ohne den Cache neu zu bauen.
+                if (QuickRidBlacklist.Contains(candidate.address))
+                    continue;
+
                 if ((candidate.door.position - origin).sqrMagnitude <= searchSqr)
                     _nearbyBuffer.Add(candidate);
             }
@@ -631,6 +674,8 @@ namespace CherryQuickRid
                 AddressCandidate candidate = candidates[i];
                 if (candidate.door == null || candidate.address == pickupAddress)
                     continue;
+                if (QuickRidBlacklist.Contains(candidate.address))
+                    continue;
 
                 float sqr = (candidate.door.position - pickupPosition).sqrMagnitude;
                 if (sqr < minSqr || sqr > maxSqr)
@@ -651,7 +696,9 @@ namespace CherryQuickRid
             mission.pickupAddress = pickupAddress;
             mission.destinationAddress = destination.address;
             mission.tripDistance = distance;
-            mission.fare = CalculateFare(distance, QuickRidRating.CurrentModifier(mission.GetRatingHistory()));
+            mission.tariffPeriod = QuickRidTariff.CurrentPeriod();
+            mission.fare = CalculateFare(distance, QuickRidRating.CurrentModifier(mission.GetRatingHistory()),
+                QuickRidTariff.Multiplier(mission.tariffPeriod));
             mission.offerExpiryTime = CreateOfferDeadline();
             mission.state = QuickRidTripState.Offered;
             return true;
@@ -674,6 +721,8 @@ namespace CherryQuickRid
                     destination = AddressHelper.ToFormattedString(mission.destinationAddress),
                     distance = UnitHelper.ToFormattedDistance(mission.tripDistance),
                     fare = mission.fare.ToString("0"),
+                    // Der Aufschlag steht im Locale-Text der jeweiligen Tarifzeit.
+                    tariff = QuickRidTariff.LocaleKey(mission.tariffPeriod).GetLocalization(),
                     // Das Zeitfenster läuft erst ab dem Einstieg – der Text sagt das dazu.
                     minutes = Mathf.RoundToInt(QuickRidRating.AllowedMinutes(mission.tripDistance))
                 }
@@ -747,9 +796,11 @@ namespace CherryQuickRid
         }
 
         /// <param name="ratingModifier">Bonus/Malus aus <see cref="QuickRidRating.CurrentModifier"/>.</param>
-        private static float CalculateFare(float distance, float ratingModifier)
+        /// <param name="tariffMultiplier">Zeitaufschlag aus <see cref="QuickRidTariff.Multiplier"/>.</param>
+        private static float CalculateFare(float distance, float ratingModifier, float tariffMultiplier)
         {
-            float raw = (FixedBaseFare + distance * FarePerMeter) * QuickRidSettings.FareMultiplier * ratingModifier;
+            float raw = (FixedBaseFare + distance * FarePerMeter)
+                * QuickRidSettings.FareMultiplier * ratingModifier * tariffMultiplier;
             return Mathf.Max(MinimumFare, Mathf.Round(raw));
         }
 
@@ -784,22 +835,70 @@ namespace CherryQuickRid
 
         // --- Adresskandidaten ----------------------------------------------------
 
-        /// <remarks>
-        /// Einmal pro Stadtladen aufgebaut und bis <c>onGameUnloaded</c> behalten. Bewusst ohne
-        /// NavMesh-Sample: das kostet pro Gebäude und die Stadt hat einige hundert davon. Gesampled
-        /// wird erst die eine Tür, die für die Anfrage gezogen wurde.
-        /// Vorbild: Streets.Pedestrians.PedestrianBuildingPositionProvider.
-        /// </remarks>
-        private List<AddressCandidate> GetAddressCandidates()
+        private void StartAddressCacheBuild()
         {
-            if (_addressCandidates != null)
-                return _addressCandidates;
+            StopAddressCacheBuild();
+            _addressCandidates = null;
+            _addressCacheRoutine = StartCoroutine(BuildAddressCacheRoutine());
+        }
+
+        private void StopAddressCacheBuild()
+        {
+            if (_addressCacheRoutine != null)
+                StopCoroutine(_addressCacheRoutine);
+
+            _addressCacheRoutine = null;
+            _addressCacheReady = false;
+        }
+
+        /// <summary>
+        /// Baut die Liste der Türen auf, an denen ein Auto überhaupt halten kann, und wärmt dabei
+        /// den Fahrgast-Pool vor. Läuft einmal pro Stadtladen.
+        /// </summary>
+        /// <remarks>
+        /// Der Filter fragt den Straßengraph des Spiels (Gley Traffic System): gibt es im Umkreis
+        /// von <see cref="QuickRidSettings.RoadProximityMeters"/> einen Fahrspur-Waypoint, der Autos
+        /// erlaubt, auf ähnlicher Höhe liegt und keine Kreuzungsverbindung ist? Dieselbe Prüfung
+        /// benutzt das Spiel für sein eigenes Taxi (TaxiSystem.IsValidWaypointForLeaving) und den
+        /// Fahrdienst (PrivateDriverHelpers.IsGoodStartWaypoint). Ein NavMesh hilft hier nicht: es
+        /// kennt nur Fußgänger- und Spieler-Agenten, keine Fahrzeuge.
+        /// <para>
+        /// Jede Abfrage scannt alle Waypoints der Stadt, deshalb die Verteilung über Frames. Ein
+        /// Coroutine-Start liegt in <c>RestoreState</c>; der Controller überlebt den Szenenwechsel
+        /// (DontDestroyOnLoad), die Routine muss deshalb in <c>OnGameUnloaded</c> gestoppt werden.
+        /// </para>
+        /// </remarks>
+        private IEnumerator BuildAddressCacheRoutine()
+        {
+            yield return new WaitUntil(() =>
+                InstanceBehavior<CityManager>.IsInitialized && TrafficManager.IsInitialized);
+
+            // Vier Fahrgäste bauen je ein Runtime-Mesh; in einem Frame gäbe das einen Hänger.
+            while (!_passengers.IsComplete)
+            {
+                if (GameManager.isCitySceneBeingUnloaded)
+                    yield break;
+
+                _passengers.CreateOne(_context?.Logger);
+                yield return null;
+            }
 
             var list = new List<AddressCandidate>();
             CityBuildingController[] controllers = InstanceBehavior<CityManager>.Instance.cityBuildingControllers;
 
+            int checkedDoors = 0;
+            int rejected = 0;
+
             for (int i = 0; i < controllers.Length; i++)
             {
+                if (i % AddressCacheBuildingsPerFrame == 0 && i > 0)
+                {
+                    yield return null;
+
+                    if (GameManager.isCitySceneBeingUnloaded || !TrafficManager.IsInitialized)
+                        yield break;
+                }
+
                 CityBuildingController controller = controllers[i];
                 if (controller == null || controller.blockPedestrianSpawn || controller.building == null)
                     continue;
@@ -810,104 +909,127 @@ namespace CherryQuickRid
                 if (door == null || door.doorTransform == null)
                     continue;
 
+                checkedDoors++;
+
+                if (!IsNearDrivableRoad(door.doorTransform.position))
+                {
+                    rejected++;
+                    continue;
+                }
+
                 list.Add(new AddressCandidate { address = controller.building.Address, door = door.doorTransform });
             }
 
             _addressCandidates = list;
-            _context?.Logger.Info($"QuickRid: {list.Count} Adresskandidaten zwischengespeichert.");
-            return list;
+            _addressCacheReady = true;
+
+            _context?.Logger.Info(
+                $"QuickRid: {list.Count} von {checkedDoors} Türen liegen höchstens " +
+                $"{QuickRidSettings.RoadProximityMeters:0} m von einer befahrbaren Straße entfernt " +
+                $"({rejected} verworfen).");
+
+            // Kippt der Filter mehr als die Hälfte weg, liegt das eher an der Schwelle als an der Stadt.
+            if (checkedDoors > 0 && rejected > checkedDoors * AddressCacheRejectWarnRatio)
+            {
+                _context?.Logger.Warn(
+                    $"QuickRid: {rejected} von {checkedDoors} Türen verworfen – " +
+                    $"QuickRidSettings.RoadProximityMeters ({QuickRidSettings.RoadProximityMeters:0} m) " +
+                    "ist vermutlich zu streng.");
+            }
+
+            _addressCacheRoutine = null;
+        }
+
+        /// <summary>Liegt neben dieser Tür ein Straßenpunkt, an dem ein Auto halten darf?</summary>
+        /// <remarks>
+        /// <c>temporaryDisabled</c> wird bewusst nicht geprüft: das Flag ist vorübergehend (etwa
+        /// wegen anderer Fahrzeuge) und würde eine dauerhaft gültige Adresse zufällig aussortieren.
+        /// </remarks>
+        private static bool IsNearDrivableRoad(Vector3 doorPosition)
+        {
+            float doorHeight = doorPosition.y;
+
+            Waypoint waypoint = TrafficManager.Instance.GetClosestWaypoint(
+                doorPosition,
+                QuickRidSettings.RoadProximityMeters,
+                w => w.allowedCars.Count > 0
+                    && TrafficManager.WithinHeight(w, doorHeight)
+                    && TrafficManager.IsNotIntersection(w));
+
+            return waypoint != null;
         }
 
         // --- Fahrgast ------------------------------------------------------------
 
-        /// <remarks>
-        /// Das Aussehen wird nur hier einmal gewürfelt und danach behalten. Grund:
-        /// <c>AppearanceSetter.UpdateVisuals</c> lässt den SkinnedMeshCombiner ein Runtime-Mesh
-        /// bauen; ob ein erneutes SetRandomAppearance das alte wirklich freigibt, ist nicht
-        /// nachprüfbar – der Combiner ist Fremdcode (MTAssets, ExternalPlugins.dll) und liegt nicht
-        /// als Quelle vor. Das Spiel selbst macht es für genau dieses Prefab ebenso: BaseHumanPool
-        /// würfelt in InitHuman beim Anlegen, ActionOnGet beim Wiederverwenden nicht mehr.
-        /// Ein Fahrgast, der bei jeder Fahrt gleich aussieht, ist der Preis dafür.
-        /// </remarks>
-        private bool EnsurePassenger()
-        {
-            if (_passengerRoot != null)
-                return true;
-            if (_passengerSpawnFailed)
-                return false;
-
-            var root = new GameObject("QuickRid - Passenger");
-
-            try
-            {
-                BaseHuman human = PrefabHelper.CreatePrefab<BaseHuman>(PassengerPrefab, root.transform);
-                human.gameObject.SetActive(true); // das Prefab wird inaktiv ausgeliefert
-                human.appearanceSetter.SetRandomAppearance();
-                human.transform.localPosition = Vector3.zero;
-                human.transform.localRotation = Quaternion.identity;
-                _passenger = human;
-            }
-            catch (Exception ex)
-            {
-                Destroy(root);
-                _passengerSpawnFailed = true;
-                _context?.Logger.Error("QuickRid: Fahrgast-Prefab konnte nicht erzeugt werden: " + ex.Message);
-                return false;
-            }
-
-            CreatePickupCircle(root.transform);
-            root.SetActive(false);
-            _passengerRoot = root;
-            return true;
-        }
-
+        /// <summary>Zeigt einen zufälligen Fahrgast aus dem Pool samt Abholring.</summary>
         private void ShowPassenger(Vector3 position, Quaternion rotation)
         {
-            if (!EnsurePassenger() || _passengerRoot == null)
+            if (!_passengers.Show(position, rotation, _context?.Logger))
                 return;
 
-            _passengerRoot.transform.SetPositionAndRotation(position, rotation);
-            UpdatePickupCircle();
-            _passengerRoot.SetActive(true);
+            ShowPickupCircle(position);
         }
 
         private void HidePassenger()
         {
-            if (_passengerRoot != null)
-                _passengerRoot.SetActive(false);
+            _passengers.Hide();
+            HidePickupCircle();
         }
 
-        /// <summary>Räumt Fahrgast, beide Ringe und das gemeinsame Material ab.</summary>
+        /// <summary>Räumt Fahrgäste, beide Ringe und das gemeinsame Material ab.</summary>
         private void DestroyVisuals()
         {
             if (GameManager.isCitySceneBeingUnloaded)
                 return;
 
-            if (_passengerRoot != null)
-                Destroy(_passengerRoot);
+            _passengers.Destroy();
+
+            if (_pickupRoot != null)
+                Destroy(_pickupRoot);
             if (_dropoffRoot != null)
                 Destroy(_dropoffRoot);
             if (_circleMaterial != null)
                 Destroy(_circleMaterial);
 
-            _passengerRoot = null;
-            _passenger = null;
+            _pickupRoot = null;
             _pickupCircle = null;
             _dropoffRoot = null;
             _dropoffCircle = null;
             _circleMaterial = null;
         }
 
-        /// <summary>Ring in Abholradius-Größe am Boden, damit die Abholzone sichtbar ist.</summary>
-        private void CreatePickupCircle(Transform parent)
+        // --- Abholzone -----------------------------------------------------------
+
+        private void ShowPickupCircle(Vector3 position)
         {
-            _pickupCircle = CreateCircle("Pickup Area", parent);
-            UpdatePickupCircle();
+            if (_circleCreationFailed)
+                return;
+
+            if (_pickupRoot == null)
+            {
+                var root = new GameObject("QuickRid - Pickup Area");
+                _pickupCircle = CreateCircle("Pickup Area", root.transform);
+
+                if (_pickupCircle == null)
+                {
+                    Destroy(root);
+                    _circleCreationFailed = true;
+                    return;
+                }
+
+                root.SetActive(false);
+                _pickupRoot = root;
+            }
+
+            _pickupRoot.transform.position = position;
+            UpdateCircle(_pickupCircle, QuickRidSettings.PickupRadiusMeters);
+            _pickupRoot.SetActive(true);
         }
 
-        private void UpdatePickupCircle()
+        private void HidePickupCircle()
         {
-            UpdateCircle(_pickupCircle, QuickRidSettings.PickupRadiusMeters);
+            if (_pickupRoot != null)
+                _pickupRoot.SetActive(false);
         }
 
         // --- Absetzzone ----------------------------------------------------------
@@ -1239,6 +1361,78 @@ namespace CherryQuickRid
             }
 
             return false;
+        }
+
+        // --- Adresse ausschließen ------------------------------------------------
+
+        /// <summary>
+        /// Adresse der laufenden Fahrt, die der Ausschluss-Button meldet: die Abholung, solange der
+        /// Fahrgast wartet, sonst das Ziel. Null, wenn gerade nichts zu melden ist.
+        /// </summary>
+        private Address? GetExcludableAddress()
+        {
+            QuickRidMission? mission = Mission;
+            if (mission == null)
+                return null;
+
+            switch (mission.state)
+            {
+                case QuickRidTripState.PassengerWaiting:
+                    return mission.pickupAddress;
+                case QuickRidTripState.PassengerAboard:
+                    return mission.destinationAddress;
+                default:
+                    return null;
+            }
+        }
+
+        /// <summary>Bestätigungsdialog des Ausschluss-Buttons im Aufgabenpanel.</summary>
+        public void PromptExcludeAddress()
+        {
+            QuickRidMission? mission = Mission;
+            Address? address = GetExcludableAddress();
+            if (mission == null || address == null || HudConfirm.isOpen)
+                return;
+
+            HudConfirm.Show(
+                new LanguageChangeEventDataHolder { Key = "quickrid_exclude_title" },
+                new LanguageChangeEventDataHolder
+                {
+                    Key = "quickrid_exclude_body",
+                    Arguments = new { address = AddressHelper.ToFormattedString(address) }
+                },
+                () => ExcludeAddress(mission, address),
+                null,
+                "quickrid_exclude_confirm",
+                "quickrid_decline_job",
+                false);
+        }
+
+        /// <summary>
+        /// Trägt die Adresse dauerhaft in die Sperrliste ein und bricht die Fahrt ab – ohne
+        /// Sternabzug, denn gemeldet wird ein Fehler der Mod, keine Entscheidung des Spielers.
+        /// </summary>
+        private void ExcludeAddress(QuickRidMission mission, Address address)
+        {
+            // Der Dialog blockiert das Spiel nicht: bis zur Bestätigung kann die Fahrt vorbei sein.
+            if (!ReferenceEquals(Mission, mission))
+                return;
+            if (mission.state != QuickRidTripState.PassengerWaiting && mission.state != QuickRidTripState.PassengerAboard)
+                return;
+
+            QuickRidBlacklist.Add(address, QuickRidBlacklist.SourceManual);
+
+            mission.excludedAddresses++;
+            QuickRidStats.SaveFrom(mission);
+
+            AbortTrip(mission);
+
+            string formatted = AddressHelper.ToFormattedString(address);
+            Notifications.Show(NotificationType.Info, "quickrid_address_excluded",
+                new Dictionary<string, string> { { "address", formatted } });
+
+            _context?.Logger.Info($"QuickRid: Adresse ausgeschlossen – {formatted} " +
+                $"({QuickRidBlacklist.Count} gesperrt, {mission.excludedAddresses} Meldungen insgesamt).");
         }
 
         // --- Online / Offline ----------------------------------------------------

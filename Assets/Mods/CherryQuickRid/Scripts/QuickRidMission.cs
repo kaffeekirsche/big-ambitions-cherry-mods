@@ -58,6 +58,19 @@ namespace CherryQuickRid
         /// <summary>Luftlinie Abholung → Ziel in Metern, Grundlage von Fahrpreis und Zeitfenster.</summary>
         public float tripDistance;
 
+        /// <summary>Tarifzeit, mit der <see cref="fare"/> gerechnet wurde.</summary>
+        /// <remarks>
+        /// Der Aufschlag steckt bereits im Preis; das Feld dient allein der Tarifzeile im
+        /// Angebotsdialog. Der erscheint erst, wenn das Auto steht, und das kann Spielminuten nach
+        /// der Generierung sein – bis dahin wäre die Tarifzeit schon eine andere.
+        /// <para>
+        /// Enum statt Multiplikator-Float: Odin legt Objekte ohne Konstruktor an, alte Spielstände
+        /// liefern also 0. Das ist hier <see cref="QuickRidTariffPeriod.Standard"/> und damit
+        /// harmlos, während ein Float auf 0 den Preis rechnerisch verschwinden ließe.
+        /// </para>
+        /// </remarks>
+        public QuickRidTariffPeriod tariffPeriod;
+
         /// <summary>Spielzeit, ab der die nächste Anfrage erscheinen darf. Null = beim nächsten Tick würfeln.</summary>
         /// <remarks>
         /// Bewusst nullbar statt mit Default: ein frisches <c>new Timestamp()</c> wäre Tag 0, 00:00 Uhr
@@ -90,8 +103,18 @@ namespace CherryQuickRid
         /// <summary>Ausgezahlte Fahrpreise insgesamt (ohne Trinkgeld).</summary>
         public float totalEarnings;
 
-        /// <summary>Trinkgeld insgesamt. Bleibt bis Stufe 6 immer 0.</summary>
+        /// <summary>Trinkgeld insgesamt.</summary>
         public float totalTips;
+
+        /// <summary>
+        /// Wie oft der Spieler insgesamt eine Adresse über das Aufgabenpanel ausgeschlossen hat.
+        /// </summary>
+        /// <remarks>
+        /// Reine Datenbasis, nirgends angezeigt: Ausschließen bricht die Fahrt ohne Sternabzug ab
+        /// und wäre damit ein bequemer Ausweg aus einer unliebsamen Fahrt. Ob das im Spiel wirklich
+        /// ausgenutzt wird, zeigt erst der Zähler – eine Strafe kommt bewusst nicht jetzt.
+        /// </remarks>
+        public int excludedAddresses;
 
         // --- Zähler dieser Online-Sitzung -------------------------------------------------------
         // Getrennt von der dauerhaften Statistik oben: sie beginnen bei jedem Online-Gehen bei 0 und
@@ -105,7 +128,7 @@ namespace CherryQuickRid
         /// <summary>Ausgezahlte Fahrpreise seit dem Online-Gehen.</summary>
         public float sessionEarnings;
 
-        /// <summary>Trinkgeld seit dem Online-Gehen. Bleibt bis Stufe 6 immer 0.</summary>
+        /// <summary>Trinkgeld seit dem Online-Gehen.</summary>
         public float sessionTips;
 
         /// <summary>Summe der vergebenen Sterne dieser Sitzung; geteilt durch <see cref="sessionTrips"/> der Schnitt.</summary>
@@ -132,6 +155,7 @@ namespace CherryQuickRid
             destinationAddress = null;
             fare = 0f;
             tripDistance = 0f;
+            tariffPeriod = QuickRidTariffPeriod.Standard;
             offerExpiryTime = null;
             tripStartTime = null;
             boardingTime = null;

@@ -21,7 +21,13 @@ namespace CherryQuickRid
         /// <summary>Sterne der letzten Fahrten, kommasepariert, älteste zuerst. Beispiel: "5,4,5".</summary>
         public const string HistoryKey = QuickRidSettings.ModDataPrefix + "rating_history";
 
-        /// <summary>Zähler als "fahrten;einnahmen;trinkgeld". Beispiel: "12;340;0".</summary>
+        /// <summary>
+        /// Zähler als "fahrten;einnahmen;trinkgeld;ausgeschlossen". Beispiel: "12;340;25;2".
+        /// </summary>
+        /// <remarks>
+        /// Das vierte Feld kam mit Stufe 6a dazu; ältere Einträge haben nur drei und lassen den
+        /// Zähler bei 0 – deshalb wird jedes Feld einzeln auf Vorhandensein geprüft.
+        /// </remarks>
         public const string StatsKey = QuickRidSettings.ModDataPrefix + "stats";
 
         private const char HistorySeparator = ',';
@@ -37,6 +43,7 @@ namespace CherryQuickRid
             mission.completedTrips = 0;
             mission.totalEarnings = 0f;
             mission.totalTips = 0f;
+            mission.excludedAddresses = 0;
 
             if (modData == null)
                 return;
@@ -60,6 +67,8 @@ namespace CherryQuickRid
                     mission.totalEarnings = earnings;
                 if (parts.Length > 2 && float.TryParse(parts[2].Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out float tips))
                     mission.totalTips = tips;
+                if (parts.Length > 3 && int.TryParse(parts[3].Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out int excluded))
+                    mission.excludedAddresses = excluded;
             }
         }
 
@@ -86,7 +95,8 @@ namespace CherryQuickRid
                 StatsSeparator.ToString(),
                 mission.completedTrips.ToString(CultureInfo.InvariantCulture),
                 mission.totalEarnings.ToString("R", CultureInfo.InvariantCulture),
-                mission.totalTips.ToString("R", CultureInfo.InvariantCulture));
+                mission.totalTips.ToString("R", CultureInfo.InvariantCulture),
+                mission.excludedAddresses.ToString(CultureInfo.InvariantCulture));
         }
     }
 }

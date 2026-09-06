@@ -1,10 +1,12 @@
 #nullable enable
+using BAModAPI;
 using Helpers;
 using Localizor.LanguageChangeEvent;
 using Streets;
 using UI;
 using UI.Tasks;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace CherryQuickRid
 {
@@ -22,6 +24,17 @@ namespace CherryQuickRid
 
         private Transform? _addressEntry;
         private TextLocalizationComponent? _addressLabel;
+
+        /// <summary>Meldet die Adresse der laufenden Fahrt als nicht anfahrbar.</summary>
+        private Button? _excludeButton;
+
+        /// <summary>Locale-Key des Tooltips am Ausschluss-Button.</summary>
+        private const string ExcludeTooltipKey = "quickrid_exclude_tooltip";
+
+        /// <summary>Ergebnis der einmaligen Sprite-Suche; null heißt "nichts gefunden".</summary>
+        private static Sprite? _fallbackCrossSprite;
+
+        private static bool _fallbackCrossSearched;
 
         /// <summary>Sterne-Vorschau für sofortiges Absetzen. Nur mit Fahrgast an Bord sichtbar.</summary>
         private Transform? _previewEntry;
@@ -102,6 +115,10 @@ namespace CherryQuickRid
 
             if (mission.state != QuickRidTripState.PassengerAboard)
                 SetPreviewVisible(false);
+
+            // Melden lässt sich nur, was gerade angefahren wird.
+            SetExcludeVisible(mission.state == QuickRidTripState.PassengerWaiting
+                || mission.state == QuickRidTripState.PassengerAboard);
 
             UpdateRating(mission);
         }
@@ -189,8 +206,10 @@ namespace CherryQuickRid
             _addressEntry = CreateAddressEntry(string.Empty, out TextLocalizationComponent addressLabel);
             _addressLabel = addressLabel;
 
-            // Kein Häkchen und kein Sprung-zur-Adresse-Button: der Kartenpin sitzt schon richtig.
-            HideEntryDecorations(_addressEntry);
+            // Kein Häkchen: den Sprung-zur-Adresse-Button braucht der Kartenpin nicht, seine Stelle
+            // in der Zeile bekommt stattdessen der Ausschluss-Button.
+            HideCheckmark(_addressEntry);
+            SetUpExcludeButton(_addressEntry);
             _addressEntry.gameObject.SetActive(false);
 
             // Zweite Unterzeile: Sterne für ein sofortiges Absetzen, nur während der Fahrt.
@@ -210,13 +229,245 @@ namespace CherryQuickRid
         /// <summary>Häkchen und Sprung-zur-Adresse-Button einer Unterzeile ausblenden.</summary>
         private static void HideEntryDecorations(Transform entry)
         {
-            Transform checkmark = entry.Find("Checkmark");
-            if (checkmark != null)
-                checkmark.gameObject.SetActive(false);
+            HideCheckmark(entry);
 
             Transform destinationButton = entry.Find("DestinationButton");
             if (destinationButton != null)
                 destinationButton.gameObject.SetActive(false);
+        }
+
+        private static void HideCheckmark(Transform entry)
+        {
+            Transform checkmark = entry.Find("Checkmark");
+            if (checkmark != null)
+                checkmark.gameObject.SetActive(false);
+        }
+
+        /// <summary>
+        /// Widmet den Sprung-zur-Adresse-Button der Adresszeile zum Ausschluss-Button um.
+        /// </summary>
+        /// <remarks>
+        /// Das Aufgabenpanel kennt nur zwei Zeilenvorlagen und keinen Text-Button; der vorhandene
+        /// Button ist deshalb der einzige Platz für eine Aktion an der Adresse. Vorlage:
+        /// TaxiTasksUI in _reference/BeATaxi~, das den gleichen Button für "Ziel neu anheften"
+        /// benutzt.
+        /// <para>
+        /// <c>onClick</c> wird <em>ersetzt</em>, nicht ergänzt: <c>RemoveAllListeners</c> räumt nur
+        /// die zur Laufzeit hinzugefügten Zuhörer ab, nicht die aus dem Prefab.
+        /// </para>
+        /// </remarks>
+        private void SetUpExcludeButton(Transform addressEntry)
+        {
+            Transform destinationButton = addressEntry.Find("DestinationButton");
+            if (destinationButton == null)
+                return;
+
+            _excludeButton = destinationButton.GetComponent<Button>();
+            if (_excludeButton == null)
+                return;
+
+            _excludeButton.onClick = new Button.ButtonClickedEvent();
+            _excludeButton.onClick.AddListener(OnClickExclude);
+
+            RetargetTooltip(destinationButton);
+            TrySwapIcon(destinationButton);
+
+            destinationButton.gameObject.SetActive(false);
+        }
+
+        /// <summary>
+        /// Ersetzt den Vanilla-Tooltip "Klicken, um als Ziel festzulegen" durch den eigenen Text.
+        /// </summary>
+        /// <remarks>
+        /// Der Tooltip hängt als <c>BasicTooltip</c> am Button und wird bei jedem Überfahren neu aus
+        /// <c>titleKey</c> und <c>descriptionKey</c> aufgebaut – ein Zuweisen der Felder genügt, es
+        /// gibt nichts aufzufrischen. Der Vanilla-Key steht nur im Prefab
+        /// (<c>bizman_hover_destination_button</c>), nicht im Code.
+        /// <para>
+        /// <c>descriptionKey</c> wird an Kommas in mehrere Zeilen zerlegt, bleibt hier deshalb leer;
+        /// der Text steht in der Überschrift. Findet sich kein <c>BasicTooltip</c>, wird der Tooltip
+        /// abgeschaltet – lieber gar keiner als ein falscher.
+        /// </para>
+        /// </remarks>
+        private void RetargetTooltip(Transform destinationButton)
+        {
+            BasicTooltip basic = destinationButton.GetComponentInChildren<BasicTooltip>(true);
+            if (basic != null)
+            {
+                basic.titleKey = ExcludeTooltipKey;
+                basic.descriptionKey = string.Empty;
+                return;
+            }
+
+            TooltipTarget other = destinationButton.GetComponentInChildren<TooltipTarget>(true);
+            if (other == null)
+                return;
+
+            other.Hide();
+            other.enabled = false;
+            _controller.Logger?.Info(
+                $"QuickRid: Tooltip-Typ {other.GetType().Name} am Ausschluss-Button unbekannt – abgeschaltet.");
+        }
+
+        /// <summary>
+        /// Tauscht das Kartenpin-Symbol gegen das X des Schließen-Buttons.
+        /// </summary>
+        /// <remarks>
+        /// Quelle ist die Zeilenvorlage <c>TasksUI.taskEntryTemplate</c> und nicht ein erzeugter
+        /// Zeit-Eintrag: die Vorlage steht, solange das Aufgabenpanel existiert. Eine eigene Grafik
+        /// gäbe es nur mit einem AssetBundle, das die Mod bewusst noch nicht hat.
+        /// </remarks>
+        private void TrySwapIcon(Transform destinationButton)
+        {
+            IModLogger? logger = _controller.Logger;
+
+            Image? targetIcon = FindIcon(destinationButton, "DestinationButton", logger);
+            if (targetIcon == null)
+            {
+                logger?.Info("QuickRid: kein Symbolbild am Ausschluss-Button gefunden – Kartenpin bleibt.");
+                return;
+            }
+
+            Image? sourceIcon = null;
+            Transform? closeButton = FindCloseButtonTemplate();
+
+            if (closeButton != null)
+                sourceIcon = FindIcon(closeButton, "CloseButton", logger);
+            else
+                logger?.Info("QuickRid: CloseButton in der Zeilenvorlage nicht gefunden.");
+
+            Sprite? sprite = sourceIcon != null ? sourceIcon.sprite : FindFallbackCrossSprite(logger);
+            if (sprite == null)
+            {
+                logger?.Info("QuickRid: kein X-Symbol gefunden – Kartenpin bleibt am Ausschluss-Button.");
+                return;
+            }
+
+            targetIcon.sprite = sprite;
+
+            // Ein X in einem pinförmigen Feld sähe sonst verzerrt aus.
+            if (sourceIcon != null)
+            {
+                targetIcon.type = sourceIcon.type;
+                targetIcon.preserveAspect = sourceIcon.preserveAspect;
+            }
+            else
+            {
+                targetIcon.preserveAspect = true;
+            }
+
+            logger?.Info($"QuickRid: Ausschluss-Button zeigt jetzt \"{sprite.name}\".");
+        }
+
+        /// <summary>Der Schließen-Button der oberen Zeilenvorlage – dort sitzt das X.</summary>
+        private static Transform? FindCloseButtonTemplate()
+        {
+            if (!InstanceBehavior<UIs>.IsInitialized)
+                return null;
+
+            TasksUI tasksUi = InstanceBehavior<UIs>.Instance.tasksUI;
+            if (tasksUi == null || tasksUi.taskEntryTemplate == null)
+                return null;
+
+            return tasksUi.taskEntryTemplate.Find("CloseButton");
+        }
+
+        /// <summary>
+        /// Das Symbolbild eines Buttons. Erst ein Kind namens "Icon" (die Schreibweise des Spiels,
+        /// siehe GameSpeedController und CollapsibleWindow), sonst das einzige Bild, das nicht der
+        /// Hintergrund ist, sonst der Hintergrund selbst.
+        /// </summary>
+        /// <remarks>
+        /// Jeder Fund wird protokolliert: ohne Einsicht ins Prefab ist das Log die einzige
+        /// Möglichkeit, die tatsächliche Struktur der Zeile zu erfahren.
+        /// </remarks>
+        private static Image? FindIcon(Transform buttonTransform, string label, IModLogger? logger)
+        {
+            var button = buttonTransform.GetComponent<Button>();
+            Graphic? background = button != null ? button.targetGraphic : null;
+
+            Image? named = null;
+            Image? single = null;
+            bool ambiguous = false;
+
+            Image[] images = buttonTransform.GetComponentsInChildren<Image>(true);
+            for (int i = 0; i < images.Length; i++)
+            {
+                Image image = images[i];
+                if (image == null)
+                    continue;
+
+                bool isBackground = ReferenceEquals(image, background);
+                logger?.Info($"QuickRid: {label} -> Bild \"{image.transform.name}\", " +
+                    $"Sprite \"{(image.sprite != null ? image.sprite.name : "-")}\", Hintergrund: {isBackground}");
+
+                if (image.transform.name == "Icon" && named == null)
+                    named = image;
+
+                if (isBackground || image.sprite == null)
+                    continue;
+
+                if (single != null)
+                    ambiguous = true;
+                else
+                    single = image;
+            }
+
+            if (named != null)
+                return named;
+            if (single != null && !ambiguous)
+                return single;
+            if (single != null)
+                return single; // mehrere Kandidaten: der erste ist die bessere Wahl als keiner
+
+            return button != null ? button.image : null;
+        }
+
+        /// <summary>
+        /// Letzter Ausweg: ein geladenes Vanilla-Sprite, dessen Name nach einem X klingt.
+        /// </summary>
+        /// <remarks>
+        /// Das Spiel führt keine Sammlung mit Symbolen – <c>GlobalReferences</c> hat nur Verläufe,
+        /// Kontakt- und Karten-Symbole. Diese Suche ist deshalb geraten und läuft nur einmal; der
+        /// gefundene Name landet im Log, damit er beim nächsten Mal fest eingetragen werden kann.
+        /// </remarks>
+        private static Sprite? FindFallbackCrossSprite(IModLogger? logger)
+        {
+            if (_fallbackCrossSearched)
+                return _fallbackCrossSprite;
+
+            _fallbackCrossSearched = true;
+
+            Sprite[] sprites = Resources.FindObjectsOfTypeAll<Sprite>();
+            for (int i = 0; i < sprites.Length; i++)
+            {
+                Sprite sprite = sprites[i];
+                if (sprite == null || string.IsNullOrEmpty(sprite.name))
+                    continue;
+
+                string name = sprite.name.ToLowerInvariant();
+                if (!name.Contains("close") && !name.Contains("cross") && !name.Contains("cancel"))
+                    continue;
+
+                _fallbackCrossSprite = sprite;
+                logger?.Info($"QuickRid: Ersatz-Symbol \"{sprite.name}\" aus den geladenen Sprites gewählt " +
+                    $"({sprites.Length} durchsucht).");
+                return sprite;
+            }
+
+            logger?.Info($"QuickRid: kein X-artiges Sprite unter {sprites.Length} geladenen gefunden.");
+            return null;
+        }
+
+        private void SetExcludeVisible(bool visible)
+        {
+            if (_excludeButton != null && _excludeButton.gameObject.activeSelf != visible)
+                _excludeButton.gameObject.SetActive(visible);
+        }
+
+        private void OnClickExclude()
+        {
+            _controller.PromptExcludeAddress();
         }
 
         /// <remarks>
@@ -312,6 +563,7 @@ namespace CherryQuickRid
         {
             _addressEntry = null;
             _addressLabel = null;
+            _excludeButton = null;
             _previewEntry = null;
             _previewLabel = null;
             _ratingEntry = null;
